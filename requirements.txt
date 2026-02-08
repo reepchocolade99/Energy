@@ -1,0 +1,45 @@
+# Energy Consumption Comparison Tool - Requirements
+
+## Frontend Dependencies
+react==18.2.0
+react-dom==18.2.0
+
+## Build Tool
+vite==5.0.8
+
+## Build Plugins
+@vitejs/plugin-react==4.2.1
+
+## Development Dependencies
+@types/react==18.2.43
+@types/react-dom==18.2.17
+
+## System Requirements
+- Node.js: 16.x or higher
+- npm: 8.x or higher
+- Modern web browser (Chrome, Firefox, Safari, Edge)
+
+## Optional - For Production Deployment
+- Docker (for containerization)
+- Node.js runtime environment
+- Web server (nginx, Apache, or Node.js)
+
+## Development Setup
+- Code Editor: Visual Studio Code recommended
+- Git: For version control
+- npm: For package management
+
+## Image Assets Required
+- Logo: public/images/logo.png
+- Solar Panels: public/images/solar-panels/*.png (5 images)
+  - monokristallijn.png
+  - polykristallijn.png
+  - glasglas.png
+  - amorf.png
+  - unknown.png
+
+## Notes
+- This is a frontend-only application
+- No backend server required for basic functionality
+- Mock data is used for energy provider contracts
+- Smart meter file upload functionality stores files in browser (no server upload)
