@@ -277,7 +277,141 @@ legend {
   transform: translateY(0);
 }
 
+/* Consumption Toggle Styles */
+.consumption-question {
+  color: #373737;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 15px;
+  display: block;
+}
+
+.consumption-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 15px;
+}
+
+.toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 15px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: #666;
+  transition: all 0.3s;
+}
+
+.toggle-btn:hover {
+  border-color: #96c63e;
+  background-color: #f9fff3;
+}
+
+.toggle-btn.active {
+  background: #96c63e;
+  color: white;
+  border-color: #96c63e;
+  box-shadow: 0 0 0 3px rgba(150, 198, 62, 0.2);
+}
+
+.toggle-icon {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+/* Energy Label Select */
+#energyLabel {
+  background-color: white;
+}
+
+/* Smart Meter Option */
+.smart-meter-option {
+  margin: 20px 0;
+  padding: 15px;
+  background-color: #f9fff3;
+  border-left: 4px solid #96c63e;
+  border-radius: 5px;
+}
+
+.smart-meter-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  margin: 0;
+}
+
+.smart-meter-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  cursor: pointer;
+}
+
+.smart-meter-text {
+  color: #373737;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.file-help {
+  color: #999;
+  font-size: 12px;
+  margin-top: 8px;
+  font-style: italic;
+}
+
+.help-text {
+  color: #999;
+  font-size: 12px;
+  margin-top: 8px;
+  font-style: italic;
+}
+
+/* Estimation Box */
+.estimation-box {
+  background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
+  border-left: 4px solid #4caf50;
+  padding: 15px;
+  border-radius: 8px;
+  margin-top: 15px;
+}
+
+.estimation-title {
+  color: #2e7d32;
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.estimation-value {
+  color: #1b5e20;
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+  font-family: 'Courier New', monospace;
+}
+
+.estimation-note {
+  color: #558b2f;
+  font-size: 12px;
+  margin: 0;
+  font-style: italic;
+}
+
 @media (max-width: 600px) {
+  .consumption-toggle {
+    grid-template-columns: 1fr;
+  }
   .form-container {
     padding: 25px;
   }
