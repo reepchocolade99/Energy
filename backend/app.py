@@ -53,6 +53,32 @@ def shaping_df(df, unit='kWh'): # Voeg 'unit' toe als tweede argument
     
     return df
 
+def calculate_deals(monthly_kwh):
+    # Inladen van je CSV bestand
+    df_contracts = pd.read_csv('vast_contract_energie.csv')
+    
+    # Maak de getallen schoon (komma's naar punten voor Python)
+    for col in ['Enkel', 'Normaal', 'Dal']:
+        df_contracts[col] = df_contracts[col].str.replace(',', '.').astype(float)
+    
+    results = []
+    yearly_kwh = monthly_kwh * 12
+
+    for index, row in df_contracts.iterrows():
+        # Basis berekening (simpel)
+        # Je kunt hier later vastrecht en gas aan toevoegen
+        yearly_cost = yearly_kwh * row['Enkel']
+        
+        results.append({
+            'provider': row['Energieleverancier'],
+            'contract': row['Contract'],
+            'monthly_cost': round(yearly_cost / 12, 2),
+            'yearly_cost': round(yearly_cost, 2),
+            'rate': row['Enkel']
+        })
+    
+    # Sorteer op goedkoopste eerst
+    return sorted(results, key=lambda x: x['monthly_cost'])
 
 @app.route('/health', methods=['GET'])
 def health():
@@ -254,56 +280,48 @@ def upload_smart_meter():
         print("[DEBUG] upload_smart_meter exception:\n" + traceback.format_exc(), flush=True)
         return jsonify({'error': f'Server error: {str(e)}'}), 500
 
-
-@app.route('/api/calculate-savings', methods=['POST'])
-def calculate_savings():
-    """
-    Calculate potential savings based on consumption data and contracts.
+@app.route('/api/compare-contracts', methods=['POST'])
+def compare_contracts():
+    data = request.json
+    monthly_kwh = float(data.get('monthlyConsumption', 0))
     
-    Expected JSON:
-    {
-        "consumption": { "electricity": 500, "gas": 150 },
-        "contracts": [
-            { "id": 1, "provider": "...", "electricityRate": 0.24, "gasRate": 0.18, "monthlyFee": 5 }
-        ]
-    }
-    """
     try:
-        data = request.get_json()
+        # We proberen eerst met ; en dan met , als backup
+        try:
+            df = pd.read_csv('vast_contract_energie.csv', sep=';')
+            if 'Enkel' not in df.columns:
+                raise Exception("Probeer komma")
+        except:
+            df = pd.read_csv('vast_contract_energie.csv', sep=',')
+
+        # Verwijder spaties rondom kolomnamen
+        df.columns = df.columns.str.strip()
         
-        if not data or 'consumption' not in data or 'contracts' not in data:
-            return jsonify({'error': 'Missing consumption or contracts data'}), 400
-        
-        consumption = data['consumption']
-        contracts = data['contracts']
-        
+        # Debug: print de kolommen die Python WEL ziet in je terminal
+        print(f"Gevonden kolommen: {df.columns.tolist()}")
+
         results = []
-        for contract in contracts:
-            monthly_cost = contract['monthlyFee']
-            monthly_cost += consumption['electricity'] * contract['electricityRate']
-            if 'gasRate' in contract and 'gas' in consumption:
-                monthly_cost += consumption['gas'] * contract['gasRate']
+        for _, row in df.iterrows():
+            # Haal tarieven op en vervang komma's door punten
+            rate_str = str(row['Enkel']).replace(',', '.')
+            rate = float(rate_str)
             
-            yearly_cost = monthly_cost * 12
+            monthly_cost = monthly_kwh * rate
             
             results.append({
-                'provider': contract['provider'],
-                'monthly_cost': round(monthly_cost, 2),
-                'yearly_cost': round(yearly_cost, 2)
+                'provider': row['Energieleverancier'],
+                'contractName': row['Contract'],
+                'rate': rate,
+                'monthlyCost': round(monthly_cost, 2),
+                'yearlyCost': round(monthly_cost * 12, 2)
             })
-        
-        # Sort by yearly cost
-        results.sort(key=lambda x: x['yearly_cost'])
-        
-        return jsonify({
-            'success': True,
-            'results': results,
-            'cheapest': results[0] if results else None
-        }), 200
-        
+            
+        sorted_results = sorted(results, key=lambda x: x['monthlyCost'])
+        return jsonify(sorted_results)
+    
     except Exception as e:
-        return jsonify({'error': f'Server error: {str(e)}'}), 500
-
+        print(f"Gedetailleerde fout: {e}")
+        return jsonify({"error": f"Kolom niet gevonden of datafout: {str(e)}"}), 500
 
 if __name__ == '__main__':
     # Default to 5001 to avoid conflicts with other local services (e.g. AirPlay)

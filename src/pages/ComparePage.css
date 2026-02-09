@@ -2,7 +2,8 @@
   width: 100%;
   min-height: 100vh;
   padding: 20px;
-  background: #ffffff;
+  background: #f4f7f1; /* Iets zachter grijs/groen voor de achtergrond */
+  font-family: 'Inter', sans-serif;
 }
 
 .compare-container {
@@ -10,24 +11,33 @@
   margin: 0 auto;
 }
 
+/* De groene header uit je oude stijl */
 .header {
   margin-bottom: 40px;
   position: relative;
-  background: #96c63e;
-  padding: 30px;
-  border-radius: 10px;
+  background: #96c63e; /* Jouw specifieke groen */
+  padding: 40px;
+  border-radius: 15px;
+  box-shadow: 0 4px 15px rgba(150, 198, 62, 0.3);
+}
+
+.header h1 {
+  color: white;
+  margin: 0 0 10px 0;
+  font-size: 32px;
 }
 
 .comparison-info {
-  color: #373737;
-  font-size: 15px;
+  color: #ffffff; /* Wit op groen leest beter */
+  font-size: 16px;
+  opacity: 0.9;
 }
 
 .back-btn {
   background: white;
   border: none;
   padding: 10px 20px;
-  border-radius: 5px;
+  border-radius: 8px;
   cursor: pointer;
   font-weight: 600;
   color: #96c63e;
@@ -37,51 +47,37 @@
 
 .back-btn:hover {
   transform: translateX(-5px);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
 }
 
-.header h1 {
-  color: white;
-  margin-bottom: 10px;
-  font-size: 32px;
-}
-
-.comparison-info {
-  color: #373737;
-  font-size: 15px;
-}
-
+/* De Grid layout voor de kaarten */
 .contracts-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 25px;
   margin-bottom: 40px;
 }
 
 .contract-card {
   background: white;
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
-  cursor: pointer;
   transition: all 0.3s;
-  border: 3px solid transparent;
+  border: 2px solid transparent;
   display: flex;
   flex-direction: column;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
 }
 
 .contract-card:hover {
   transform: translateY(-5px);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-}
-
-.contract-card.selected {
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1);
   border-color: #96c63e;
-  box-shadow: 0 0 0 3px rgba(150, 198, 62, 0.2);
 }
 
 .card-header {
-  padding: 20px;
-  border-bottom: 2px solid #f0f0f0;
+  padding: 25px;
+  border-bottom: 1px solid #f0f0f0;
   display: flex;
   align-items: center;
   gap: 15px;
@@ -89,240 +85,164 @@
 
 .provider-icon {
   font-size: 32px;
+  background: #f0f7e6;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: #96c63e;
 }
 
 .card-header h3 {
   margin: 0;
   color: #373737;
-  font-size: 18px;
+  font-size: 20px;
 }
 
 .card-content {
-  padding: 20px;
+  padding: 25px;
   flex: 1;
 }
 
-.badge-container {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 15px;
-  flex-wrap: wrap;
-}
-
-.badge {
-  display: inline-block;
-  padding: 5px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.badge.green {
-  background-color: #d4edda;
-  color: #155724;
-}
-
-.contract-duration {
-  display: inline-block;
-  padding: 5px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-  background-color: #e7f3ff;
-  color: #0066cc;
-}
-
+/* Prijssectie */
 .pricing-info {
   margin-bottom: 20px;
 }
 
-.price-row {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 8px;
+.main-price-row {
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.price-label {
+  display: block;
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 5px;
+}
+
+.price-amount {
+  color: #96c63e;
+  font-size: 36px;
+  font-weight: 800;
+}
+
+.price-period {
+  font-size: 16px;
+  color: #666;
+  font-weight: 400;
+}
+
+.yearly-total {
+  text-align: center;
+  font-size: 14px;
+  color: #888;
+  margin-bottom: 20px;
+}
+
+.rates-box {
+  background-color: #f9f9f9;
+  padding: 15px;
+  border-radius: 8px;
   font-size: 14px;
 }
 
-.price-row.main-price {
-  border-top: 2px solid #f0f0f0;
-  padding-top: 10px;
-  margin-bottom: 0;
-  font-weight: 600;
-}
-
-.price-row .label {
-  color: #666;
-}
-
-.price-row .price {
-  color: #373737;
-  font-weight: 600;
-}
-
-.price-row.main-price .price {
-  color: #96c63e;
-  font-size: 18px;
-}
-
-.rates {
-  background-color: #f9f9f9;
-  padding: 12px;
-  border-radius: 5px;
-  font-size: 13px;
-}
-
-.rate-item {
+.rate-row {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.rate-item:last-child {
-  margin-bottom: 0;
-}
-
-.rate-label {
-  color: #666;
+  color: #555;
 }
 
 .rate-value {
-  color: #373737;
   font-weight: 600;
+  color: #373737;
 }
 
 .select-btn {
   width: 100%;
-  padding: 12px;
+  padding: 15px;
   background-color: #f0f0f0;
   border: none;
-  border-radius: 5px;
+  border-radius: 0 0 10px 10px; /* Alleen onderkant afronden */
   cursor: pointer;
-  font-weight: 600;
+  font-weight: 700;
   color: #666;
   transition: all 0.3s;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
-.contract-card.selected .select-btn {
+.contract-card:hover .select-btn {
   background-color: #96c63e;
   color: white;
 }
 
-.select-btn:hover {
-  background-color: #e0e0e0;
-}
-
-.contract-card.selected .select-btn:hover {
-  background-color: #7fa02f;
-}
-
-.comparison-table {
-  background: white;
-  border-radius: 10px;
-  padding: 30px;
-  margin-bottom: 30px;
-  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
-}
-
-.comparison-table h2 {
-  margin-top: 0;
-  margin-bottom: 20px;
-  color: #373737;
-  font-size: 24px;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-table thead {
-  background-color: #f5f5f5;
-}
-
-table th {
-  padding: 15px;
-  text-align: left;
-  color: #373737;
-  font-weight: 600;
-  border-bottom: 2px solid #ddd;
-}
-
-table td {
-  padding: 15px;
-  border-bottom: 1px solid #eee;
-  color: #666;
-}
-
-table tbody tr:hover {
-  background-color: #f9f9f9;
-}
-
-table tbody tr.cheapest {
-  background-color: #f0f7ff;
-}
-
-table tbody tr.cheapest .yearly-cost {
-  color: #96c63e;
-  font-weight: 600;
-}
-
-.provider-name {
+/* Loading state */
+.loading-container {
   display: flex;
+  flex-direction: column;
+  justify-content: center;
   align-items: center;
-  gap: 10px;
-  font-weight: 600;
-  color: #373737;
+  height: 80vh;
+  color: #96c63e;
 }
 
-.provider-name .icon {
-  font-size: 20px;
+/* Top Vergelijker Balk */
+.comparison-bar {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 20px;
+  overflow-x: auto;
+  padding: 10px 5px;
 }
 
-.yearly-cost {
-  font-weight: 600;
-  color: #373737;
-}
-
-.savings-info {
-  margin-top: 20px;
+.mini-card {
+  flex: 1;
+  min-width: 200px;
+  background: white;
   padding: 20px;
-  background-color: #e8f5e9;
-  border-left: 4px solid #4caf50;
-  border-radius: 5px;
+  border-radius: 12px;
+  border: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
-.savings-info p {
-  margin: 5px 0;
-  color: #2e7d32;
-  font-size: 14px;
+.mini-card.cheapest {
+  border: 2px solid #96c63e;
+  background: #fafff0;
 }
 
-.selection-hint {
-  text-align: center;
+.winner-badge {
+  position: absolute;
+  top: -10px;
+  background: #96c63e;
+  color: white;
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-weight: bold;
+}
+
+.mini-provider {
+  font-weight: 700;
   color: #373737;
-  padding: 20px;
-  font-size: 14px;
+  margin-bottom: 8px;
 }
 
-@media (max-width: 768px) {
-  .contracts-grid {
-    grid-template-columns: 1fr;
-  }
+.mini-price {
+  font-size: 22px;
+  font-weight: 800;
+  color: #96c63e;
+}
 
-  .header h1 {
-    font-size: 24px;
-  }
-
-  table {
-    font-size: 13px;
-  }
-
-  table th,
-  table td {
-    padding: 10px;
-  }
-
-  .comparison-table {
-    padding: 15px;
-  }
+/* Hulpklasse voor de tekst onder de providernaam */
+.contract-name-sub {
+  margin: 0;
+  font-size: 14px;
+  color: #888;
 }

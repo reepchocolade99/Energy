@@ -10,7 +10,15 @@ function App() {
 
   const handleHomeSubmit = (data) => {
     setFormData(data)
-    setCurrentPage('personal')
+    
+    // DE LOGICA: Hebben we slimme meter data?
+    if (data.isFromSmartMeter) {
+      // Ja -> Toon eerst de grafieken (Inzicht)
+      setCurrentPage('personal')
+    } else {
+      // Nee -> Ga direct naar de vergelijker
+      setCurrentPage('compare')
+    }
   }
 
   const handleGoHome = () => {
@@ -24,19 +32,25 @@ function App() {
 
   return (
     <div className="app">
-      {currentPage === 'home' ? (
+      {currentPage === 'home' && (
         <HomePage onSubmit={handleHomeSubmit} />
-      ) : currentPage === 'personal' ? (
+      )}
+      
+      {currentPage === 'personal' && (
         <PersonalDataPage 
           formData={formData} 
           onGoHome={handleGoHome}
           onSwitchTab={handleSwitchTab}
         />
-      ) : (
-        <ComparePage formData={formData} onGoHome={handleGoHome} />
+      )}
+      
+      {currentPage === 'compare' && (
+        <ComparePage 
+          formData={formData} 
+          onGoHome={handleGoHome} 
+        />
       )}
     </div>
   )
 }
-
 export default App

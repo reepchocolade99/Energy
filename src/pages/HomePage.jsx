@@ -17,7 +17,7 @@ function HomePage({ onSubmit }) {
     homeBatteryCapacity: 'unknown',
     hasSmartMeter: false,
     smartMeterFile: null,
-    // For unknown consumption
+    energyUnit: 'kWh', // Belangrijk voor MWh/kWh keuze
     energyLabel: '',
     householdMembers: '',
   })
@@ -34,26 +34,11 @@ function HomePage({ onSubmit }) {
   ]
 
   const solarPanelInfo = {
-    monokristallijn: {
-      label: 'Monokristallijn (Zwart)',
-      description: 'Hoge efficiëntie (18-22%), langdurig betrouwbaar, duurder maar beter rendement op lange termijn.'
-    },
-    polykristallijn: {
-      label: 'Polykristallijn (Blauw)',
-      description: 'Goede efficiëntie (15-17%), kosteneffectief, populaire keuze voor huishoudens.'
-    },
-    glasglas: {
-      label: 'Glas-glas zonnepanelen',
-      description: 'Dubbele glaslaag, uitzonderlijke duurzaamheid, zeer weersbestendig, langere levensduur (40+ jaar).'
-    },
-    amorf: {
-      label: 'Amorf / Dunne film panelen',
-      description: 'Lager rendement (8-10%), beter in zwak licht, flexibel en licht, ideaal voor aangepaste toepassingen.'
-    },
-    unknown: {
-      label: 'Geen idee',
-      description: ''
-    }
+    monokristallijn: { label: 'Monokristallijn (Zwart)', description: 'Hoge efficiëntie (18-22%).' },
+    polykristallijn: { label: 'Polykristallijn (Blauw)', description: 'Kosteneffectief.' },
+    glasglas: { label: 'Glas-glas', description: 'Uitzonderlijke duurzaamheid.' },
+    amorf: { label: 'Amorf', description: 'Beter in zwak licht.' },
+    unknown: { label: 'Geen idee', description: '' }
   }
 
   const [errors, setErrors] = useState({})
@@ -64,147 +49,91 @@ function HomePage({ onSubmit }) {
       ...prev,
       [name]: type === 'checkbox' ? checked : type === 'file' ? files?.[0] : value
     }))
-    // Clear error for this field
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }))
-    }
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }))
   }
 
   const estimateConsumption = () => {
-    // Estimate yearly consumption based on energy label and household members
-    const baseLabelConsumption = {
-      'A': 1500,
-      'B': 2000,
-      'C': 2500,
-      'D': 3500,
-      'E': 4500,
-      'F': 5500,
-      'G': 6500,
-      'unknown': 3000
-    }
-
-    const members = parseInt(formData.householdMembers) || 1
-    const labelConsumption = baseLabelConsumption[formData.energyLabel] || 3000
-    
-    // Adjust for household size
+    const baseLabelConsumption = { 'A': 1500, 'B': 2000, 'C': 2500, 'D': 3500, 'E': 4500, 'F': 5500, 'G': 6500, 'unknown': 3000 }
+    const members = parseInt(formData.householdMembers) || 0
+    const labelConsumption = baseLabelConsumption[formData.energyLabel] || 0
+    if (members === 0 || labelConsumption === 0) return 0
     const estimatedYearly = labelConsumption + (members - 1) * 500
-    return estimatedYearly / 12 // Return monthly estimate
+    return estimatedYearly / 12
   }
 
   const validateForm = () => {
-    const newErrors = {}
-
+    const newErrors = {};
     if (consumptionKnown === 'known') {
-      // Route 1: Bekend verbruik
       if (formData.hasSmartMeter) {
-        // Optie A: Via bestand
-        if (!formData.smartMeterFile) {
-          newErrors.smartMeterFile = 'Upload a file or uncheck the smart meter option'
-        }
+        if (!formData.smartMeterFile) newErrors.smartMeterFile = 'Upload een bestand';
       } else {
-        // Optie B: Handmatig getal
-        if (!formData.monthlyConsumption) {
-          newErrors.monthlyConsumption = 'Monthly consumption is required'
-        } else if (isNaN(formData.monthlyConsumption) || formData.monthlyConsumption <= 0) {
-          newErrors.monthlyConsumption = 'Monthly consumption must be a positive number'
-        }
+        if (!formData.monthlyConsumption) newErrors.monthlyConsumption = 'Verbruik is verplicht';
+        else if (isNaN(formData.monthlyConsumption) || formData.monthlyConsumption <= 0) newErrors.monthlyConsumption = 'Voer een positief getal in';
       }
-   } else if (consumptionKnown === 'unknown') {
-  // Route 2: Onbekend verbruik (Gokken)
-      if (!formData.energyLabel) {
-        newErrors.energyLabel = 'Energielabel is verplicht';
-      }
-      if (!formData.householdMembers) {
-        newErrors.householdMembers = 'Aantal personen is verplicht';
-      } else if (isNaN(formData.householdMembers) || formData.householdMembers <= 0) {
-        newErrors.householdMembers = 'Voer een geldig aantal personen in';
-      }
-    
+    } else if (consumptionKnown === 'unknown') {
+      if (!formData.energyLabel) newErrors.energyLabel = 'Energielabel is verplicht';
+      if (!formData.householdMembers || formData.householdMembers <= 0) newErrors.householdMembers = 'Aantal personen is verplicht';
     } else {
-      // Route 3: Nog niets gekozen
-      newErrors.consumptionKnown = 'Please select an option'
+      newErrors.consumptionKnown = 'Maak een keuze';
     }
 
-    // Algemene velden (Gas & Zonnepanelen)
-    if (formData.hasGas && (!formData.gasConsumption || isNaN(formData.gasConsumption) || formData.gasConsumption <= 0)) {
-      newErrors.gasConsumption = 'Gas consumption must be a positive number'
-    }
-    if (formData.hasSolarPanels && (!formData.solarPanelCount || isNaN(formData.solarPanelCount) || formData.solarPanelCount <= 0)) {
-      newErrors.solarPanelCount = 'Aantal zonnepanelen moet een positief getal zijn'
-    }
+    if (formData.hasGas && (!formData.gasConsumption || formData.gasConsumption <= 0)) newErrors.gasConsumption = 'Vul gasverbruik in';
+    if (formData.hasSolarPanels && (!formData.solarPanelCount || formData.solarPanelCount <= 0)) newErrors.solarPanelCount = 'Vul aantal panelen in';
 
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
-
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSubmit = async (e) => {
-  e.preventDefault()
-  
-  if (validateForm()) {
-    let submitData = { ...formData }
+    e.preventDefault();
+    if (validateForm()) {
+      let submitData = { ...formData };
 
-    // OPTIE 1: Verbruik wordt gegokt (Onbekend)
-    if (consumptionKnown === 'unknown') {
-      const estimatedMonthly = estimateConsumption()
-      submitData.monthlyConsumption = estimatedMonthly
-      submitData.estimatedFromLabel = true
-      submitData.energyLabelUsed = formData.energyLabel
-      
-      // Direct door naar de volgende pagina
-      onSubmit(submitData)
-      return 
-    }
-
-    // OPTIE 2: Gebruiker heeft een bestand (Slimme meter)
-    if (formData.hasSmartMeter && formData.smartMeterFile) {
-      try {
-        const fileFormData = new FormData()
-        fileFormData.append('file', formData.smartMeterFile)
-        fileFormData.append('unit', formData.energyUnit || 'kWh')
-        
-        const response = await fetch('http://localhost:5001/api/upload-smart-meter', {
-          method: 'POST',
-          body: fileFormData
-        })
-        
-        if (!response.ok) {
-          const error = await response.json()
-          setErrors(prev => ({ ...prev, smartMeterFile: error.error || 'Fout bij verwerken bestand' }))
-          return
-        }
-        
-        const processedData = await response.json()
-        
-        // Voeg de data van de backend toe aan het formulier
-        const enhancedFormData = {
-          ...submitData,
-          monthlyConsumption: processedData.summary.average_daily_consumption * 30, // Bereken maandgemiddelde
-          smartMeterData: processedData.summary,
-          hourlyAnalytics: processedData.hourly_analytics,
-          isFromSmartMeter: true
-        }
-        
-        onSubmit(enhancedFormData)
-      } catch (error) {
-        setErrors(prev => ({
-          ...prev,
-          smartMeterFile: 'Kan geen verbinding maken met de server op poort 5001'
-        }))
+      // ROUTE: Gokken
+      if (consumptionKnown === 'unknown') {
+        submitData.monthlyConsumption = estimateConsumption();
+        submitData.estimatedFromLabel = true;
+        onSubmit(submitData);
+        return;
       }
-      return
-    }
 
-    // OPTIE 3: Handmatig ingevuld (Bekend, maar geen bestand)
-    // Als we hier komen, betekent het dat consumptionKnown === 'known' is 
-    // en hasSmartMeter uit staat (of geen bestand heeft).
-    onSubmit(submitData)
+      // ROUTE: Bestand
+      if (formData.hasSmartMeter && formData.smartMeterFile) {
+        try {
+          const fileFormData = new FormData();
+          fileFormData.append('file', formData.smartMeterFile);
+          fileFormData.append('unit', formData.energyUnit || 'kWh');
+          
+          const response = await fetch('http://localhost:5001/api/upload-smart-meter', {
+            method: 'POST',
+            body: fileFormData
+          });
+          
+          if (!response.ok) {
+            const error = await response.json();
+            setErrors(prev => ({ ...prev, smartMeterFile: error.error || 'Upload fout' }));
+            return;
+          }
+          
+          const res = await response.json();
+          onSubmit({
+            ...submitData,
+            monthlyConsumption: res.summary.average_daily_consumption * 30,
+            smartMeterData: res.summary,
+            hourlyAnalytics: res.hourly_analytics,
+            isFromSmartMeter: true
+          });
+        } catch (error) {
+          setErrors(prev => ({ ...prev, smartMeterFile: 'Backend niet bereikbaar op 5001' }));
+        }
+        return;
+      }
+
+      // ROUTE: Handmatig
+      onSubmit(submitData);
     }
-  }
+  };
+
 
   return (
     <div className="home-page">
@@ -364,7 +293,11 @@ function HomePage({ onSubmit }) {
 
                 <div className="estimation-box">
                   <p className="estimation-title">📊 Geschat maandelijks verbruik:</p>
-                  <p className="estimation-value">{formData.energyLabel && formData.householdMembers ? `${estimateConsumption().toFixed(0)} kWh` : 'Selecteer label en huishoudgrootte'}</p>
+                  <p className="estimation-value">
+                    {formData.energyLabel && formData.householdMembers 
+                      ? `${estimateConsumption().toFixed(0)} kWh` 
+                      : 'Selecteer label en huishoudgrootte'}
+                  </p>
                   <p className="estimation-note">Dit is een schatting op basis van het energielabel en huishoudgrootte</p>
                 </div>
               </fieldset>
