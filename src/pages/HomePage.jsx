@@ -98,101 +98,111 @@ function HomePage({ onSubmit }) {
     const newErrors = {}
 
     if (consumptionKnown === 'known') {
-      if (!formData.monthlyConsumption) newErrors.monthlyConsumption = 'Monthly consumption is required'
-      if (isNaN(formData.monthlyConsumption) || formData.monthlyConsumption <= 0) newErrors.monthlyConsumption = 'Monthly consumption must be a positive number'
-    } else if (consumptionKnown === 'unknown') {
-      if (!formData.energyLabel) newErrors.energyLabel = 'Energy label is required'
-      if (!formData.householdMembers) newErrors.householdMembers = 'Number of household members is required'
-      if (isNaN(formData.householdMembers) || formData.householdMembers <= 0) newErrors.householdMembers = 'Number of members must be a positive number'
+      // Route 1: Bekend verbruik
+      if (formData.hasSmartMeter) {
+        // Optie A: Via bestand
+        if (!formData.smartMeterFile) {
+          newErrors.smartMeterFile = 'Upload a file or uncheck the smart meter option'
+        }
+      } else {
+        // Optie B: Handmatig getal
+        if (!formData.monthlyConsumption) {
+          newErrors.monthlyConsumption = 'Monthly consumption is required'
+        } else if (isNaN(formData.monthlyConsumption) || formData.monthlyConsumption <= 0) {
+          newErrors.monthlyConsumption = 'Monthly consumption must be a positive number'
+        }
+      }
+   } else if (consumptionKnown === 'unknown') {
+  // Route 2: Onbekend verbruik (Gokken)
+      if (!formData.energyLabel) {
+        newErrors.energyLabel = 'Energielabel is verplicht';
+      }
+      if (!formData.householdMembers) {
+        newErrors.householdMembers = 'Aantal personen is verplicht';
+      } else if (isNaN(formData.householdMembers) || formData.householdMembers <= 0) {
+        newErrors.householdMembers = 'Voer een geldig aantal personen in';
+      }
+    
     } else {
+      // Route 3: Nog niets gekozen
       newErrors.consumptionKnown = 'Please select an option'
     }
 
+    // Algemene velden (Gas & Zonnepanelen)
     if (formData.hasGas && (!formData.gasConsumption || isNaN(formData.gasConsumption) || formData.gasConsumption <= 0)) {
       newErrors.gasConsumption = 'Gas consumption must be a positive number'
     }
     if (formData.hasSolarPanels && (!formData.solarPanelCount || isNaN(formData.solarPanelCount) || formData.solarPanelCount <= 0)) {
       newErrors.solarPanelCount = 'Aantal zonnepanelen moet een positief getal zijn'
     }
-    if (formData.hasSmartMeter && !formData.smartMeterFile) {
-      newErrors.smartMeterFile = 'Bestand is vereist'
-    }
+
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
+
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    if (validateForm()) {
-      let submitData = { ...formData }
+  e.preventDefault()
+  
+  if (validateForm()) {
+    let submitData = { ...formData }
 
-      // If consumption is unknown, use estimated value
-      if (consumptionKnown === 'unknown') {
-        submitData.monthlyConsumption = estimateConsumption()
-        submitData.estimatedFromLabel = true
-        submitData.energyLabelUsed = formData.energyLabel
-      }
+    // OPTIE 1: Verbruik wordt gegokt (Onbekend)
+    if (consumptionKnown === 'unknown') {
+      const estimatedMonthly = estimateConsumption()
+      submitData.monthlyConsumption = estimatedMonthly
+      submitData.estimatedFromLabel = true
+      submitData.energyLabelUsed = formData.energyLabel
+      
+      // Direct door naar de volgende pagina
+      onSubmit(submitData)
+      return 
+    }
 
-      // If smart meter file is present, process it with backend
-      if (formData.smartMeterFile) {
-        try {
-          const fileFormData = new FormData()
-          fileFormData.append('file', formData.smartMeterFile)
-          
-          const response = await fetch('http://localhost:5000/api/upload-smart-meter', {
-            method: 'POST',
-            body: fileFormData
-          })
-          
-          if (!response.ok) {
-            const error = await response.json()
-            setErrors(prev => ({
-              ...prev,
-              smartMeterFile: error.error || 'Error processing smart meter file'
-            }))
-            return
-          }
-          
-          const processedData = await response.json()
-          
-          // Calculate peak hour and lowest hour from hourly data
-          const hourlyData = processedData.hourly_analytics
-          let peakHour = 0
-          let lowestHour = 0
-          let maxValue = -Infinity
-          let minValue = Infinity
-          
-          for (const [hour, data] of Object.entries(hourlyData)) {
-            if (data.diff > maxValue) {
-              maxValue = data.diff
-              peakHour = hour
-            }
-            if (data.diff < minValue) {
-              minValue = data.diff
-              lowestHour = hour
-            }
-          }
-          
-          // Add processed smart meter data to form data
-          const enhancedFormData = {
-            ...submitData,
-            smartMeterData: processedData.summary,
-            hourlyAnalytics: hourlyData,
-            peakHour: parseInt(peakHour),
-            lowestHour: parseInt(lowestHour)
-          }
-          
-          onSubmit(enhancedFormData)
-        } catch (error) {
-          setErrors(prev => ({
-            ...prev,
-            smartMeterFile: 'Error connecting to backend. Make sure the Python server is running on localhost:5000'
-          }))
+    // OPTIE 2: Gebruiker heeft een bestand (Slimme meter)
+    if (formData.hasSmartMeter && formData.smartMeterFile) {
+      try {
+        const fileFormData = new FormData()
+        fileFormData.append('file', formData.smartMeterFile)
+        fileFormData.append('unit', formData.energyUnit || 'kWh')
+        
+        const response = await fetch('http://localhost:5001/api/upload-smart-meter', {
+          method: 'POST',
+          body: fileFormData
+        })
+        
+        if (!response.ok) {
+          const error = await response.json()
+          setErrors(prev => ({ ...prev, smartMeterFile: error.error || 'Fout bij verwerken bestand' }))
+          return
         }
-      } else {
-        onSubmit(submitData)
+        
+        const processedData = await response.json()
+        
+        // Voeg de data van de backend toe aan het formulier
+        const enhancedFormData = {
+          ...submitData,
+          monthlyConsumption: processedData.summary.average_daily_consumption * 30, // Bereken maandgemiddelde
+          smartMeterData: processedData.summary,
+          hourlyAnalytics: processedData.hourly_analytics,
+          isFromSmartMeter: true
+        }
+        
+        onSubmit(enhancedFormData)
+      } catch (error) {
+        setErrors(prev => ({
+          ...prev,
+          smartMeterFile: 'Kan geen verbinding maken met de server op poort 5001'
+        }))
       }
+      return
+    }
+
+    // OPTIE 3: Handmatig ingevuld (Bekend, maar geen bestand)
+    // Als we hier komen, betekent het dat consumptionKnown === 'known' is 
+    // en hasSmartMeter uit staat (of geen bestand heeft).
+    onSubmit(submitData)
     }
   }
 
@@ -243,21 +253,24 @@ function HomePage({ onSubmit }) {
             <>
               <fieldset>
                 <legend>Je Energieverbruik</legend>
-                
-                <div className="form-group">
-                  <label htmlFor="monthlyConsumption">Maandlijks Elektriciteitsverbruik (kWh) *</label>
-                  <input
-                    type="number"
-                    id="monthlyConsumption"
-                    name="monthlyConsumption"
-                    value={formData.monthlyConsumption}
-                    onChange={handleChange}
-                    step="0.01"
-                    min="0"
-                    className={errors.monthlyConsumption ? 'error' : ''}
-                  />
-                  {errors.monthlyConsumption && <span className="error-message">{errors.monthlyConsumption}</span>}
-                </div>
+
+                {/* Toon dit veld alleen als er GEEN slimme meter wordt gebruikt */}
+                {!formData.hasSmartMeter && (
+                  <div className="form-group">
+                    <label htmlFor="monthlyConsumption">Maandelijks Elektriciteitsverbruik (kWh) *</label>
+                    <input
+                      type="number"
+                      id="monthlyConsumption"
+                      name="monthlyConsumption"
+                      value={formData.monthlyConsumption}
+                      onChange={handleChange}
+                      step="0.01"
+                      min="0"
+                      className={errors.monthlyConsumption ? 'error' : ''}
+                    />
+                    {errors.monthlyConsumption && <span className="error-message">{errors.monthlyConsumption}</span>}
+                  </div>
+                )}
 
                 <div className="smart-meter-option">
                   <label htmlFor="hasSmartMeter" className="smart-meter-label">
@@ -268,12 +281,29 @@ function HomePage({ onSubmit }) {
                       checked={formData.hasSmartMeter}
                       onChange={handleChange}
                     />
-                    <span className="smart-meter-text">Of upload je slimme meter data (CSV/Excel) voor nauwkeurigere analyse</span>
+                    <span className="smart-meter-text">
+                      {formData.hasSmartMeter 
+                        ? "Ik gebruik mijn slimme meter data" 
+                        : "Of upload je slimme meter data (CSV/Excel) voor nauwkeurigere analyse"}
+                    </span>
                   </label>
                 </div>
 
                 {formData.hasSmartMeter && (
                   <div className="form-group">
+                    {/* Keuze voor de eenheid (kWh of MWh) */}
+                    <label htmlFor="energyUnit">Eenheid in bestand:</label>
+                    <select 
+                      id="energyUnit" 
+                      name="energyUnit" 
+                      value={formData.energyUnit || 'kWh'} 
+                      onChange={handleChange}
+                      style={{ marginBottom: '10px', display: 'block' }}
+                    >
+                      <option value="kWh">Kilowattuur (kWh)</option>
+                      <option value="MWh">Megawattuur (MWh)</option>
+                    </select>
+
                     <label htmlFor="smartMeterFile">Upload CSV of Excel bestand *</label>
                     <input
                       type="file"
@@ -284,10 +314,6 @@ function HomePage({ onSubmit }) {
                       className={errors.smartMeterFile ? 'error' : ''}
                     />
                     {errors.smartMeterFile && <span className="error-message">{errors.smartMeterFile}</span>}
-                    {formData.smartMeterFile && (
-                      <span className="file-selected">✓ {formData.smartMeterFile.name}</span>
-                    )}
-                    <p className="file-help">Bestand moet 'date' en 'total' kolommen bevatten</p>
                   </div>
                 )}
               </fieldset>

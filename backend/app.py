@@ -4,41 +4,52 @@ from io import BytesIO
 import os
 from dotenv import load_dotenv
 from flask_cors import CORS
+import traceback
+from werkzeug.utils import secure_filename
 
 load_dotenv()
 
 app = Flask(__name__)
 
-# Configure CORS properly for Vite frontend
-CORS(app, resources={
-    r"/api/*": {
-        "origins": ["http://localhost:5173", "http://127.0.0.1:5173"],
-        "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type"],
-        "supports_credentials": False,
-        "max_age": 3600
-    }
-})
+# Use flask-cors middleware for API routes (only allow Vite frontend)
+# This provides the Access-Control-* headers automatically for routes under /api/*
+# Temporarily allow all origins for debugging CORS issues. Change back to specific origin after debugging.
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
-def shaping_df(df):
-    """
-    Shape and process energy consumption data from smart meter files.
+
+# Debug: log incoming requests (does not modify responses)
+@app.before_request
+def log_request_info():
+    try:
+        origin = request.headers.get('Origin')
+        print(f"[DEBUG] Incoming request: {request.method} {request.path} from {request.remote_addr}", flush=True)
+        print(f"[DEBUG] Origin: {origin}", flush=True)
+        print(f"[DEBUG] Content-Length: {request.content_length}", flush=True)
+        print(f"[DEBUG] Headers: {dict(request.headers)}", flush=True)
+    except Exception:
+        print("[DEBUG] Error while logging request info:\n" + traceback.format_exc(), flush=True)
+
+def shaping_df(df, unit='kWh'): # Voeg 'unit' toe als tweede argument
+    df = df.copy()
+    df['date'] = pd.to_datetime(df['date'])
+    df = df.set_index('date')
     
-    Args:
-        df (pd.DataFrame): DataFrame with 'date' and 'total' columns
-        
-    Returns:
-        pd.DataFrame: Processed dataframe with daily totals and differences
-    """
-    df = df.set_index(['date'])
-    df.index = pd.to_datetime(df.index)
+    # Zet om naar getallen
+    df['total'] = pd.to_numeric(df['total'], errors='coerce')
     
-    daily = df['total'].resample('D').mean()
-    daily = daily.to_frame()
-    daily['diff'] = daily['total'].diff().fillna(0)
+    # Correctie op basis van de gekozen unit
+    if unit == 'MWh':
+        # Als de gebruiker zegt dat het MWh is, rekenen we het om naar kWh
+        # (Meestal is x 1000 de standaard voor MWh -> kWh)
+        df['total'] = df['total'] * 1000 
     
-    df['daily_total'] = df['total'].resample('D').mean().reindex(df.index, method='ffill')
-    df['diff'] = df['total'].diff().fillna(0)
+    # Bereken het verbruik per interval
+    df['consumption_interval'] = df['total'].diff().fillna(0)
+    df.loc[df['consumption_interval'] < 0, 'consumption_interval'] = 0
+    
+    # Bereken daggemiddelde
+    df['daily_total'] = df['consumption_interval'].resample('D').sum().reindex(df.index, method='ffill')
+    df['diff'] = df['consumption_interval']
     
     return df
 
@@ -46,6 +57,7 @@ def shaping_df(df):
 @app.route('/health', methods=['GET'])
 def health():
     """Health check endpoint"""
+    print("[DEBUG] /health called", flush=True)
     return jsonify({'status': 'ok', 'message': 'Backend is running'}), 200
 
 
@@ -155,7 +167,9 @@ def upload_smart_meter():
         JSON with processed data summary and hourly analytics
     """
     try:
+        print("[DEBUG] upload_smart_meter called", flush=True)
         if 'file' not in request.files:
+            print("[DEBUG] No 'file' in request.files", flush=True)
             return jsonify({'error': 'No file provided'}), 400
         
         file = request.files['file']
@@ -163,18 +177,35 @@ def upload_smart_meter():
         if file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
         
+        # Save uploaded file to uploads directory
+        upload_dir = os.path.join(os.path.dirname(__file__), 'uploads')
+        os.makedirs(upload_dir, exist_ok=True)
+        safe_name = secure_filename(file.filename)
+        saved_path = os.path.join(upload_dir, safe_name)
+        try:
+            file.save(saved_path)
+            print(f"[DEBUG] Saved uploaded file to: {saved_path}", flush=True)
+        except Exception as e:
+            print("[DEBUG] Error saving file:\n" + traceback.format_exc(), flush=True)
+            return jsonify({'error': f'Error saving file: {str(e)}'}), 500
+        
         # Check file extension
         filename = file.filename.lower()
+        filename = safe_name.lower()
         
         # Read file based on type
         try:
             if filename.endswith('.csv'):
-                df = pd.read_csv(file)
+                df = pd.read_csv(saved_path)
             elif filename.endswith(('.xlsx', '.xls')):
-                df = pd.read_excel(file)
+                df = pd.read_excel(saved_path)
             else:
+                print(f"[DEBUG] Unsupported file extension: {filename}", flush=True)
                 return jsonify({'error': 'File must be CSV or Excel format'}), 400
+            print(f"[DEBUG] Read file, shape={getattr(df, 'shape', None)}", flush=True)
+            print(f"[DEBUG] Columns: {list(df.columns)}", flush=True)
         except Exception as e:
+            print("[DEBUG] Error reading file:\n" + traceback.format_exc(), flush=True)
             return jsonify({'error': f'Error reading file: {str(e)}'}), 400
         
         # Validate required columns
@@ -182,14 +213,16 @@ def upload_smart_meter():
             return jsonify({'error': 'File must contain "date" and "total" columns'}), 400
         
         # Process the dataframe
-        processed_df = shaping_df(df)
+        unit = request.form.get('unit', 'kWh')
+        processed_df = shaping_df(df,'unit')
         
         # Calculate hourly analytics
-        hourly_avg = processed_df.groupby(processed_df.index.hour).mean()
+        hourly_avg = processed_df.groupby(processed_df.index.hour).mean(numeric_only=True)
+        
         hourly_data = {
             str(int(hour)): {
                 'diff': float(value) if pd.notna(value) else 0,
-                'total': float(processed_df[processed_df.index.hour == hour]['total'].mean()) if pd.notna(processed_df[processed_df.index.hour == hour]['total'].mean()) else 0
+                'total': float(processed_df[processed_df.index.hour == hour]['total'].mean(numeric_only=True)) if pd.notna(processed_df[processed_df.index.hour == hour]['total'].mean(numeric_only=True)) else 0
             }
             for hour, value in hourly_avg['diff'].items()
         }
@@ -218,6 +251,7 @@ def upload_smart_meter():
         return jsonify(response_data), 200
         
     except Exception as e:
+        print("[DEBUG] upload_smart_meter exception:\n" + traceback.format_exc(), flush=True)
         return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 
@@ -272,7 +306,8 @@ def calculate_savings():
 
 
 if __name__ == '__main__':
-    port = int(os.getenv('PORT', 5000))
+    # Default to 5001 to avoid conflicts with other local services (e.g. AirPlay)
+    port = int(os.getenv('PORT', 5001))
     print(f"\n⚡ Energy Backend Starting...")
     print(f"🔗 Server: http://localhost:{port}")
     print(f"📊 Status: http://localhost:{port}/")
