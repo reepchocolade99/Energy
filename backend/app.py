@@ -379,3 +379,41 @@ def calculate_variable_costs(processed_df):
     except Exception as e:
         print(f"Fout in variabele berekening: {e}")
         return 0, None
+    
+
+@app.route('/api/monthly-detail', methods=['POST'])
+def monthly_detail():
+    try:
+        data = request.json
+        target_month = int(data.get('month', 1))
+        
+        # We pakken het meest recente bestand uit de uploads map
+        upload_dir = os.path.join(os.path.dirname(__file__), 'uploads')
+        files = [f for f in os.listdir(upload_dir) if f.endswith('.csv')]
+        if not files:
+            return jsonify([])
+
+        latest_file = os.path.join(upload_dir, sorted(files, key=lambda x: os.path.getmtime(os.path.join(upload_dir, x)))[-1])
+        
+        # Inladen en vormgeven (gebruik je bestaande shaping_df functie indien nodig)
+        df = pd.read_csv(latest_file)
+        
+        # Simpele datum conversie voor de grafiek
+        df['datetime'] = pd.to_datetime(df['only_date'])
+        df = df.set_index('datetime')
+        
+        # Filter op geselecteerde maand
+        df_month = df[df.index.month == target_month]
+        
+        # Groepeer per dag en bereken verbruik
+        daily = df_month.resample('D').sum(numeric_only=True)
+        
+        chart_data = [
+            {"day": d.day, "verbruik": round(float(row['low_used_diff'] + row['normal_used_diff']), 2)}
+            for d, row in daily.iterrows()
+        ]
+        
+        return jsonify(chart_data)
+    except Exception as e:
+        print(f"Grafiek fout: {e}")
+        return jsonify([]), 500

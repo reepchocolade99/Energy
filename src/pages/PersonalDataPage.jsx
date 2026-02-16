@@ -1,53 +1,39 @@
 import { useState, useEffect } from 'react'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts'
 import './PersonalDataPage.css'
 
 function PersonalDataPage({ formData, onGoHome, onSwitchTab }) {
-  const [analyticsData, setAnalyticsData] = useState(null)
-  const [error, setError] = useState(null)
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
+  const [chartData, setChartData] = useState([])
+  const [showChart, setShowChart] = useState(false)
+  const [loadingChart, setLoadingChart] = useState(false)
 
-  // Initialisatie van data
+  const summary = formData?.smartMeterData || {}
+  const monthlyConsumption = formData?.monthlyConsumption || 0
+
+  // Effect om grafiekdata op te halen als de maand of zichtbaarheid verandert
   useEffect(() => {
-    if (!formData?.smartMeterData) {
-      setError('Geen slimme meter data beschikbaar. Upload eerst een bestand.')
-      return
+    if (showChart) {
+      fetchDailyData(selectedMonth)
     }
-    setAnalyticsData(formData)
-  }, [formData])
+  }, [selectedMonth, showChart])
 
-  if (!analyticsData) {
-    return (
-      <div className="personal-data-page">
-        <div className="container">
-          <button className="back-btn" onClick={onGoHome}>← Terug</button>
-          <div className="empty-state">
-            <p className="empty-icon">📊</p>
-            <h2>Geen Data Beschikbaar</h2>
-            <p>{error || 'Gegevens laden...'}</p>
-            <button className="upload-btn" onClick={onGoHome}>Bestand Uploaden</button>
-          </div>
-        </div>
-      </div>
-    )
+  const fetchDailyData = async (month) => {
+    setLoadingChart(true)
+    try {
+      const response = await fetch('http://localhost:5001/api/monthly-detail', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ month: month })
+      })
+      const data = await response.json()
+      setChartData(data)
+    } catch (err) {
+      console.error("Fout bij ophalen grafiekdata:", err)
+    } finally {
+      setLoadingChart(false)
+    }
   }
-
-  // variabelen definiëren op basis van de gepushte analyticsData
-  const summary = analyticsData.smartMeterData || {}
-  const hourlyData = analyticsData.hourlyAnalytics || {}
-  
-  // Verbruikscijfers
-  const avgDaily = summary.average_daily_consumption || 0
-  const totalConsumption = summary.total_kwh || 0
-  const monthlyConsumption = analyticsData.monthlyConsumption || 0
-
-  // Logica voor Piek- en Laagste uur
-  const hours = Object.keys(hourlyData)
-  const peakHour = hours.length > 0 
-    ? hours.reduce((a, b) => (hourlyData[a]?.diff > hourlyData[b]?.diff ? a : b)) 
-    : "N/A"
-  
-  const lowestHour = hours.length > 0 
-    ? hours.reduce((a, b) => (hourlyData[a]?.diff < hourlyData[b]?.diff ? a : b)) 
-    : "N/A"
 
   return (
     <div className="personal-data-page">
@@ -55,118 +41,81 @@ function PersonalDataPage({ formData, onGoHome, onSwitchTab }) {
         <div className="header">
           <button className="back-btn" onClick={onGoHome}>← Terug</button>
           <h1>⚡ Jouw Energieverbruik Profiel</h1>
-          <p className="subtitle">
-            Periode: {summary?.date_range_start?.split(' ')[0]} tot {summary?.date_range_end?.split(' ')[0]}
-          </p>
         </div>
 
-        {/* Key Metrics Grid */}
         <div className="metrics-grid">
-          <div className="metric-card">
-            <div className="metric-icon">📈</div>
-            <div className="metric-content">
-              <p className="metric-label">Gem. Dagelijks</p>
-              <p className="metric-value">{avgDaily.toFixed(2)} <span className="unit">kWh</span></p>
-            </div>
-          </div>
-
-          <div className="metric-card">
+          {/* Klikbare Kaart: Maandelijks */}
+          <div 
+            className={`metric-card clickable ${showChart ? 'active' : ''}`} 
+            onClick={() => {
+            console.log("Kaart geklikt! Huidige status:", !showChart);
+            setShowChart(!showChart);
+          }}
+          >
             <div className="metric-icon">📅</div>
             <div className="metric-content">
-              <p className="metric-label">Gem. Maandelijks</p>
+              <p className="metric-label">Gem. Maandelijks (Klik voor grafiek)</p>
               <p className="metric-value">{monthlyConsumption.toFixed(2)} <span className="unit">kWh</span></p>
             </div>
           </div>
 
           <div className="metric-card">
-            <div className="metric-icon">⚡</div>
+            <div className="metric-icon">📈</div>
             <div className="metric-content">
-              <p className="metric-label">Totaal Verbruik</p>
-              <p className="metric-value">{totalConsumption.toFixed(2)} <span className="unit">kWh</span></p>
-            </div>
-          </div>
-
-          <div className="metric-card">
-            <div className="metric-icon">🔴</div>
-            <div className="metric-content">
-              <p className="metric-label">Piekuur</p>
-              <p className="metric-value">{peakHour}:00</p>
-            </div>
-          </div>
-
-          <div className="metric-card">
-            <div className="metric-icon">🟢</div>
-            <div className="metric-content">
-              <p className="metric-label">Laagste Uur</p>
-              <p className="metric-value">{lowestHour}:00</p>
-            </div>
-          </div>
-
-          <div className="metric-card">
-            <div className="metric-icon">📊</div>
-            <div className="metric-content">
-              <p className="metric-label">Max. Dagelijks</p>
-              <p className="metric-value">{summary?.max_daily_consumption?.toFixed(2) || '0.00'} <span className="unit">kWh</span></p>
+              <p className="metric-label">Gem. Dagelijks</p>
+              <p className="metric-value">{(summary.average_daily_consumption || 0).toFixed(2)} <span className="unit">kWh</span></p>
             </div>
           </div>
         </div>
 
-        {/* Info Box */}
-        <div className="info-box">
-          <div className="info-icon">💡</div>
-          <div className="info-content">
-            <h3>Over Jouw Verbruik</h3>
-            <p>
-              Je gemiddelde verbruik per maand is <strong>{monthlyConsumption.toFixed(2)} kWh</strong>. 
-              Dat komt neer op ongeveer <strong>{avgDaily.toFixed(2)} kWh</strong> per dag. 
-              Het hoogste verbruik vindt plaats rond <strong>{peakHour}:00 uur</strong>.
-            </p>
+        {/* Interactieve Grafiek Sectie */}
+        {showChart && (
+          <div className="chart-container-wrapper">
+            <div className="chart-header">
+              <h3>Verbruik per dag</h3>
+              <select 
+                value={selectedMonth} 
+                onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                className="month-select"
+              >
+                {["Januari", "Februari", "Maart", "April", "Mei", "Juni", "Juli", "Augustus", "September", "Oktober", "November", "December"].map((month, idx) => (
+                  <option key={idx} value={idx + 1}>{month}</option>
+                ))}
+              </select>
+            </div>
+
+            {loadingChart ? (
+              <div className="chart-loading">Data ophalen...</div>
+            ) : (
+              <div className="chart-holder">
+                <ResponsiveContainer width="100%" height={300}>
+                  <AreaChart data={chartData}>
+                    <defs>
+                      <linearGradient id="colorUsage" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#96c63e" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#96c63e" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="day" />
+                    <YAxis unit="kWh" />
+                    <Tooltip />
+                    <Area 
+                      type="monotone" 
+                      dataKey="verbruik" 
+                      stroke="#96c63e" 
+                      fillOpacity={1} 
+                      fill="url(#colorUsage)" 
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </div>
-        </div>
+        )}
 
-        <table className="stats-table">
-          <thead>
-            <tr>
-              <th>Statistiek</th>
-              <th>Waarde</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>Gemiddeld dagelijks verbruik</td>
-              <td className="value">{avgDaily.toFixed(2)} kWh</td>
-            </tr>
-            <tr>
-              <td>Gemiddeld maandelijks verbruik</td>
-              <td className="value">{monthlyConsumption.toFixed(2)} kWh</td>
-            </tr>
-            <tr>
-              <td>Maximaal dagelijks verbruik</td>
-              <td className="value">{summary?.max_daily_consumption?.toFixed(2) || '0.00'} kWh</td>
-            </tr>
-            <tr>
-              <td>Minimaal dagelijks verbruik</td>
-              <td className="value">{summary?.min_daily_consumption?.toFixed(2) || '0.00'} kWh</td>
-            </tr>
-            <tr className="highlight">
-              <td><strong>Totaal periode verbruik</strong></td>
-              <td className="value"><strong>{totalConsumption.toFixed(2)} kWh</strong></td>
-            </tr>
-          </tbody>
-        </table>
-
-        {/* Action Buttons */}
-        <div className="action-buttons">
-          <button className="compare-btn" onClick={onSwitchTab}>
-            ⚖️ Vergelijk Contracten
-          </button>
-          <button className="new-file-btn" onClick={onGoHome}>
-            📤 Gegevens Bewerken
-          </button>
-        </div>
+        {/* ... Rest van je tabel en actieknoppen ... */}
       </div>
     </div>
   )
 }
-
-export default PersonalDataPage

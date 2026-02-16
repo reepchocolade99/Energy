@@ -43,3 +43,10 @@ vite==5.0.8
 - No backend server required for basic functionality
 - Mock data is used for energy provider contracts
 - Smart meter file upload functionality stores files in browser (no server upload)
+
+
+flask
+flask-cors
+pandas
+python-dotenv
+werkzeug
