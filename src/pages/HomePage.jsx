@@ -83,58 +83,89 @@ function HomePage({ onSubmit }) {
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
-
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (validateForm()) {
-      let submitData = { ...formData };
+  e.preventDefault();
+  console.log("Submit geklikt!");
 
-      // ROUTE: Gokken
-      if (consumptionKnown === 'unknown') {
-        submitData.monthlyConsumption = estimateConsumption();
-        submitData.estimatedFromLabel = true;
-        onSubmit(submitData);
-        return;
-      }
+  if (validateForm()) {
+    console.log("Validatie geslaagd, versturen naar backend...");
+    let submitData = { ...formData };
 
-      // ROUTE: Bestand
-      if (formData.hasSmartMeter && formData.smartMeterFile) {
-        try {
-          const fileFormData = new FormData();
-          fileFormData.append('file', formData.smartMeterFile);
-          fileFormData.append('unit', formData.energyUnit || 'kWh');
-          
-          const response = await fetch('http://localhost:5001/api/upload-smart-meter', {
-            method: 'POST',
-            body: fileFormData
-          });
-          
-          if (!response.ok) {
-            const error = await response.json();
-            setErrors(prev => ({ ...prev, smartMeterFile: error.error || 'Upload fout' }));
-            return;
+    // ROUTE 1: Verbruik onbekend (Schatten op basis van label)
+    if (consumptionKnown === 'unknown') {
+      submitData.monthlyConsumption = estimateConsumption();
+      submitData.estimatedFromLabel = true;
+      onSubmit(submitData);
+      return;
+    }
+
+    // ROUTE 2: Slimme meter bestand uploaden
+    if (formData.hasSmartMeter && formData.smartMeterFile) {
+      try {
+        const fileFormData = new FormData();
+        fileFormData.append('file', formData.smartMeterFile);
+        fileFormData.append('unit', formData.energyUnit || 'kWh');
+        
+        const backendUrl = "http://127.0.0.1:5001/api/upload-smart-meter";
+        const response = await fetch(backendUrl, {
+          method: 'POST',
+          body: fileFormData
+        });
+
+        console.log("Stap 1: Response ontvangen. Status:", response.status);
+
+        // Belangrijk: we lezen de response eerst als tekst om te zien wat er ECHT binnenkomt
+        const rawText = await response.text();
+        console.log("Stap 2: Ruwe data van server:", rawText);
+
+        if (!response.ok) {
+          console.error("Stap 3: Server gaf een foutmelding.");
+          let errorMessage = 'Upload fout';
+          try {
+            const errorJson = JSON.parse(rawText);
+            errorMessage = errorJson.error || errorMessage;
+          } catch (e) {
+            errorMessage = `Server error (${response.status})`;
           }
+          setErrors(prev => ({ ...prev, smartMeterFile: errorMessage }));
+          return;
+        }
+
+        // Als response OK is, parse de ruwe tekst naar JSON
+        const res = JSON.parse(rawText);
+        console.log("Stap 3: Geparsed JSON resultaat:", res);
+
+        if (res && res.summary) {
+          console.log("Stap 4: Summary gevonden, navigeren via onSubmit...");
           
-          const res = await response.json();
+          
           onSubmit({
             ...submitData,
-            monthlyConsumption: res.summary.average_daily_consumption * 30,
+            monthlyConsumption: res.summary.monthlyConsumption,
             smartMeterData: res.summary,
-            hourlyAnalytics: res.hourly_analytics,
+            hourlyAnalytics: res.hourly_analytics || [],
+            variableCostsTotal: res.summary.variable_costs_total || 0,
             isFromSmartMeter: true
           });
-        } catch (error) {
-          setErrors(prev => ({ ...prev, smartMeterFile: 'Backend niet bereikbaar op 5001' }));
+        } else {
+          console.error("Stap 4: FOUT - 'summary' ontbreekt in resultaat:", res);
+          setErrors(prev => ({ ...prev, smartMeterFile: 'Server stuurde onvolledige data' }));
         }
-        return;
+
+      } catch (error) {
+        console.error("Stap 5: Kritieke Fetch Error:", error);
+        setErrors(prev => ({ ...prev, smartMeterFile: 'Backend niet bereikbaar op 127.0.0.1:5001' }));
       }
-
-      // ROUTE: Handmatig
-      onSubmit(submitData);
+      return; 
     }
-  };
 
-
+    // ROUTE 3: Handmatige invoer (geen bestand, wel bekend verbruik)
+    console.log("Route 3: Handmatige invoer verzenden...");
+    onSubmit(submitData);
+  } else {
+    console.log("Validatie gefaald. Controleer de rode meldingen.");
+  }
+};
   return (
     <div className="home-page">
       <div className="form-container">
