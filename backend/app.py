@@ -253,7 +253,13 @@ def upload_smart_meter():
                 'date_range_start': str(start_date),
                 'date_range_end': str(end_date)
             },
-            'hourly_analytics': hourly_data
+            'hourly_analytics': hourly_data,
+            'consumption_split': {
+                'total_normal_used': float(df_final['normal_used_diff'].sum()),
+                'total_low_used': float(df_final['low_used_diff'].sum()),
+                'monthly_normal_used': float(df_final['normal_used_diff'].sum() / num_days * 30.44),
+                'monthly_low_used': float(df_final['low_used_diff'].sum() / num_days * 30.44)
+            }
         }
         
         print(f"--- DEBUG VERBRUIK ---")
@@ -271,54 +277,73 @@ def upload_smart_meter():
 @app.route('/api/compare-contracts', methods=['POST'])
 def compare_contracts():
     data = request.json
-    monthly_kwh = float(data.get('monthlyConsumption', 0))
+    monthly_normal_kwh = float(data.get('monthlyNormalUsed', 0))
+    monthly_low_kwh = float(data.get('monthlyLowUsed', 0))
     
     try:
-        # We proberen eerst met ; en dan met , als backup
-        try:
-            df = pd.read_csv('vast_contract_energie.csv', sep=';')
-            if 'Enkel' not in df.columns:
-                raise Exception("Probeer komma")
-        except:
-            df = pd.read_csv('vast_contract_energie.csv', sep=',')
+        # Load het nieuwe contracten_energie bestand
+        df = pd.read_csv('contracten_energie.csv', sep=',')
 
         # Verwijder spaties rondom kolomnamen
         df.columns = df.columns.str.strip()
         
-        # Debug: print de kolommen die Python WEL ziet in je terminal
         print(f"Gevonden kolommen: {df.columns.tolist()}")
 
         results = []
         for _, row in df.iterrows():
-            # Haal tarieven op en vervang komma's door punten
-            rate_str = str(row['Enkel']).replace(',', '.')
-            rate = float(rate_str)
+            # Skip alle "Dynamisch" contracten - zonnenplan.nl wordt apart toegevoegd
+            if row.get('Contract', 'Onbekend') == 'Dynamisch':
+                continue
             
-            monthly_cost = monthly_kwh * rate
+            # Haal tarieven op en vervang komma's door punten
+            normal_rate_str = str(row.get('Normaal', '0')).replace(',', '.')
+            low_rate_str = str(row.get('Dal', '0')).replace(',', '.')
+            extra_costs_str = str(row.get('Extra Kosten', '0')).replace(',', '.')
+            
+            try:
+                normal_rate = float(normal_rate_str)
+                low_rate = float(low_rate_str)
+                extra_costs = float(extra_costs_str)
+            except:
+                continue
+            
+            # Berekening: Normaal tarief * normal_used_diff + Dal tarief * low_used_diff
+            monthly_normal_cost = monthly_normal_kwh * normal_rate
+            monthly_low_cost = monthly_low_kwh * low_rate
+            monthly_total_cost = monthly_normal_cost + monthly_low_cost + extra_costs
+            
+            yearly_normal_cost = monthly_normal_cost * 12
+            yearly_low_cost = monthly_low_cost * 12
+            yearly_total_cost = monthly_total_cost * 12
             
             results.append({
-                'provider': row['Energieleverancier'],
-                'contractName': row['Contract'],
-                'rate': rate,
-                'monthlyCost': round(monthly_cost, 2),
-                'yearlyCost': round(monthly_cost * 12, 2)
+                'provider': row.get('Energieleverancier', 'Onbekend'),
+                'contractName': row.get('Contract', 'Onbekend'),
+                'normalRate': round(normal_rate, 4),
+                'lowRate': round(low_rate, 4),
+                'monthlyCostNormal': round(monthly_normal_cost, 2),
+                'monthlyCostLow': round(monthly_low_cost, 2),
+                'monthlyCostExtra': round(extra_costs, 2),
+                'monthlyCost': round(monthly_total_cost, 2),
+                'yearlyCostNormal': round(yearly_normal_cost, 2),
+                'yearlyCostLow': round(yearly_low_cost, 2),
+                'yearlyCost': round(yearly_total_cost, 2)
             })
             
         sorted_results = sorted(results, key=lambda x: x['monthlyCost'])
+        
+        # Voeg het dynamische zonnenplan.nl contract toe (marktprijzen)
+        zonnenplan_contract = calculate_zonnenplan_contract(monthly_normal_kwh, monthly_low_kwh)
+        if zonnenplan_contract:
+            sorted_results.append(zonnenplan_contract)
+            # Sorteer opnieuw met het nieuwe contract
+            sorted_results = sorted(sorted_results, key=lambda x: x['monthlyCost'])
+        
         return jsonify(sorted_results)
     
     except Exception as e:
         print(f"Gedetailleerde fout: {e}")
-        return jsonify({"error": f"Kolom niet gevonden of datafout: {str(e)}"}), 500
-
-if __name__ == '__main__':
-    # Default to 5001 to avoid conflicts with other local services (e.g. AirPlay)
-    port = int(os.getenv('PORT', 5001))
-    print(f"\n⚡ Energy Backend Starting...")
-    print(f"🔗 Server: http://127.0.0.1:{port}")
-    print(f"📊 Status: http://127.0.0.1:{port}/")
-    print(f"✓ CORS enabled\n")
-    app.run(debug=True, port=5001, host='0.0.0.0')
+        return jsonify({"error": f"Contracten bestand error: {str(e)}"}), 500
 
 @app.route('/api/upload-usage', methods=['POST'])
 def upload_file():
@@ -332,6 +357,173 @@ def upload_file():
         "variabele_kosten": round(kosten, 2),
         "status": "success"
     }
+
+def calculate_zonnenplan_contract(monthly_normal_kwh, monthly_low_kwh):
+    """
+    Berekent het dynamische zonnenplan.nl contract op basis van:
+    - Marktprijzen uit Netherlands.csv (per uur in EUR/MWhe)
+    - Daadwerkelijk verbruik uit check_hourly_usage.csv
+    """
+    try:
+        # 1. Laad Nederland marktprijzen
+        prices_path = os.path.join(os.path.dirname(__file__), 'data', 'Netherlands.csv')
+        if not os.path.exists(prices_path):
+            return None
+        
+        prices_df = pd.read_csv(prices_path)
+        prices_df['datetime'] = pd.to_datetime(prices_df['Datetime (UTC)'])
+        prices_df['price_eur_per_kwh'] = prices_df['Price (EUR/MWhe)'] / 1000
+        prices_df = prices_df[['datetime', 'price_eur_per_kwh']].set_index('datetime')
+        
+        # 2. Laad het daadwerkelijke verbruik
+        usage_path = os.path.join(os.path.dirname(__file__), 'data', 'check_hourly_usage.csv')
+        if not os.path.exists(usage_path):
+            return None
+        
+        usage_df = pd.read_csv(usage_path)
+        usage_df['datetime'] = pd.to_datetime(usage_df['datetime'])
+        usage_df = usage_df.set_index('datetime')
+        
+        # 3. Inner join op datetime (only matching hours)
+        combined = usage_df[['low_used_diff', 'normal_used_diff']].join(
+            prices_df['price_eur_per_kwh'],
+            how='inner'
+        ).dropna()
+        
+        if combined.empty:
+            return None
+        
+        # 4. Bereken kosten per uur (marktprijs + 0.19 vaste component)
+        combined['cost_per_hour'] = (
+            combined['low_used_diff'] * (combined['price_eur_per_kwh'] + 0.01393) +
+            combined['normal_used_diff'] * (combined['price_eur_per_kwh'] + 0.01391)
+        )
+        
+        # 5. Groepeer per maand en bereken totale kosten
+        combined['year_month'] = combined.index.to_period('M')
+        monthly_costs = combined.groupby('year_month')['cost_per_hour'].sum()
+        
+        # Bereken gemiddeld maandelijks bedrag
+        if len(monthly_costs) > 0:
+            avg_monthly_cost = float(monthly_costs.mean())
+            yearly_cost = float(monthly_costs.sum())
+        else:
+            return None
+        
+        # Ruw tariefschatting (gem. prijs per kWh)
+        total_kwh = (combined['low_used_diff'].sum() + combined['normal_used_diff'].sum())
+        total_cost = combined['cost_per_hour'].sum()
+        
+        if total_kwh > 0:
+            avg_rate = total_cost / total_kwh
+        else:
+            return None
+        
+        return {
+            'provider': 'zonnenplan.nl',
+            'contractName': 'Dynamisch',
+            'normalRate': round(avg_rate, 4),
+            'lowRate': round(avg_rate, 4),  # Gelijk tarief (marktprijs geldt voor beide)
+            'monthlyCostNormal': round(avg_monthly_cost * (monthly_normal_kwh / (monthly_normal_kwh + monthly_low_kwh)) if (monthly_normal_kwh + monthly_low_kwh) > 0 else 0, 2),
+            'monthlyCostLow': round(avg_monthly_cost * (monthly_low_kwh / (monthly_normal_kwh + monthly_low_kwh)) if (monthly_normal_kwh + monthly_low_kwh) > 0 else 0, 2),
+            'monthlyCostExtra': 0.0,
+            'monthlyCost': round(avg_monthly_cost, 2),
+            'yearlyCostNormal': round(yearly_cost * (monthly_normal_kwh / (monthly_normal_kwh + monthly_low_kwh)) * 12 if (monthly_normal_kwh + monthly_low_kwh) > 0 else 0, 2),
+            'yearlyCostLow': round(yearly_cost * (monthly_low_kwh / (monthly_normal_kwh + monthly_low_kwh)) * 12 if (monthly_normal_kwh + monthly_low_kwh) > 0 else 0, 2),
+            'yearlyCost': round(yearly_cost * 12, 2)
+        }
+    except Exception as e:
+        print(f"[ERROR] Zonnenplan contract berekening fout: {e}")
+        return None
+
+
+@app.route('/api/zonnenplan-monthly', methods=['POST', 'OPTIONS'])
+def zonnenplan_monthly():
+    # Handle preflight
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+
+    try:
+        prices_path = os.path.join(os.path.dirname(__file__), 'data', 'Netherlands.csv')
+        if not os.path.exists(prices_path):
+            return jsonify([])
+
+        prices_df = pd.read_csv(prices_path)
+        prices_df['datetime'] = pd.to_datetime(prices_df['Datetime (UTC)'])
+        prices_df['price_eur_per_kwh'] = pd.to_numeric(prices_df['Price (EUR/MWhe)'], errors='coerce') / 1000
+        prices_df = prices_df[['datetime', 'price_eur_per_kwh']].set_index('datetime')
+
+        # Prefer most recent upload in uploads/ (contains returned columns)
+        upload_dir = os.path.join(os.path.dirname(__file__), 'uploads')
+        files = [f for f in os.listdir(upload_dir) if f.endswith('.csv')] if os.path.exists(upload_dir) else []
+        if not files:
+            return jsonify([])
+        latest_file = os.path.join(upload_dir, sorted(files, key=lambda x: os.path.getmtime(os.path.join(upload_dir, x)))[-1])
+
+        usage_df = pd.read_csv(latest_file)
+        # some uploads may have only_date/only_time; try to parse datetime robustly
+        if 'datetime' in usage_df.columns:
+            usage_df['datetime'] = pd.to_datetime(usage_df['datetime'], errors='coerce')
+        elif 'only_date' in usage_df.columns and 'only_time' in usage_df.columns:
+            usage_df['datetime'] = pd.to_datetime(usage_df['only_date'].astype(str) + ' ' + usage_df['only_time'].astype(str), errors='coerce')
+        else:
+            # try to find any date-like column
+            if 'date' in usage_df.columns:
+                usage_df['datetime'] = pd.to_datetime(usage_df['date'], errors='coerce')
+
+        usage_df = usage_df.dropna(subset=['datetime']).set_index('datetime')
+
+        combined = usage_df.join(prices_df['price_eur_per_kwh'], how='inner').fillna(0)
+
+        # Ensure columns exist
+        for col in ['low_used_diff', 'normal_used_diff', 'low_returned_diff', 'normal_returned_diff']:
+            if col not in combined.columns:
+                combined[col] = 0
+
+        # Costs computation
+        combined['normal_used_cost'] = combined['normal_used_diff'] * (combined['price_eur_per_kwh'] + 0.19)
+        combined['low_used_cost'] = combined['low_used_diff'] * (combined['price_eur_per_kwh'] + 0.19)
+        combined['normal_return_comp'] = combined['normal_returned_diff'] * combined['price_eur_per_kwh']
+        combined['low_return_comp'] = combined['low_returned_diff'] * combined['price_eur_per_kwh']
+        combined['net_cost'] = combined['normal_used_cost'] + combined['low_used_cost'] - (combined['normal_return_comp'] + combined['low_return_comp'])
+
+        combined['year_month'] = combined.index.to_period('M')
+        grouped = combined.groupby('year_month')
+
+        month_map = {1: 'Jan', 2: 'Feb', 3: 'Mrt', 4: 'Apr', 5: 'Mei', 6: 'Jun', 7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Okt', 11: 'Nov', 12: 'Dec'}
+        out = []
+        for period, grp in grouped:
+            month_num = int(period.month)
+            normal_used_sum = float(grp['normal_used_cost'].sum())
+            low_used_sum = float(grp['low_used_cost'].sum())
+            normal_return_sum = float(grp['normal_return_comp'].sum())
+            low_return_sum = float(grp['low_return_comp'].sum())
+
+            normal_cost = normal_used_sum - normal_return_sum
+            low_cost = low_used_sum - low_return_sum
+            total = float(grp['net_cost'].sum())
+            verbruik_normaal = float(grp['normal_used_diff'].sum())
+            verbruik_dal = float(grp['low_used_diff'].sum())
+
+            out.append({
+                'month': month_map.get(month_num, str(month_num)),
+                'normaal': round(normal_cost, 2),
+                'dal': round(low_cost, 2),
+                'totaal': round(total, 2),
+                'verbruik_normaal': round(verbruik_normaal, 2),
+                'verbruik_dal': round(verbruik_dal, 2),
+                'vergoeding_normaal': round(normal_return_sum, 2),
+                'vergoeding_dal': round(low_return_sum, 2),
+                'vergoeding_totaal': round(normal_return_sum + low_return_sum, 2)
+            })
+
+        # sort by month order
+        month_order = list(month_map.values())
+        out_sorted = sorted(out, key=lambda x: month_order.index(x['month']) if x['month'] in month_order else 0)
+        return jsonify(out_sorted)
+    except Exception as e:
+        print(f"[ERROR] zonnenplan_monthly: {e}")
+        return jsonify([]), 500
 
 def calculate_variable_costs(processed_df):
     try:
@@ -395,25 +587,94 @@ def monthly_detail():
 
         latest_file = os.path.join(upload_dir, sorted(files, key=lambda x: os.path.getmtime(os.path.join(upload_dir, x)))[-1])
         
-        # Inladen en vormgeven (gebruik je bestaande shaping_df functie indien nodig)
+        # Inladen
         df = pd.read_csv(latest_file)
         
-        # Simpele datum conversie voor de grafiek
+        # Datum conversie
         df['datetime'] = pd.to_datetime(df['only_date'])
         df = df.set_index('datetime')
         
         # Filter op geselecteerde maand
         df_month = df[df.index.month == target_month]
         
-        # Groepeer per dag en bereken verbruik
+        # Groepeer per dag en bereken verbruik en teruglevering
         daily = df_month.resample('D').sum(numeric_only=True)
         
-        chart_data = [
-            {"day": d.day, "verbruik": round(float(row['low_used_diff'] + row['normal_used_diff']), 2)}
-            for d, row in daily.iterrows()
-        ]
+        chart_data = []
+        for d, row in daily.iterrows():
+            # Separate normal and low usage for accurate cost calculation on frontend
+            low_used = float(row.get('low_used_diff', 0))
+            normal_used = float(row.get('normal_used_diff', 0))
+            verbruik = low_used + normal_used
+
+            low_returned = float(row.get('low_returned_diff', 0))
+            normal_returned = float(row.get('normal_returned_diff', 0))
+            teruglevering = low_returned + normal_returned
+
+            chart_data.append({
+                "day": d.day,
+                "verbruik": round(verbruik, 2),
+                "teruglevering": round(teruglevering, 2),
+                "low": round(low_used, 2),
+                "normal": round(normal_used, 2)
+            })
         
         return jsonify(chart_data)
     except Exception as e:
         print(f"Grafiek fout: {e}")
         return jsonify([]), 500
+
+@app.route('/api/hourly-detail', methods=['POST'])
+def hourly_detail():
+    try:
+        data = request.json
+        target_month = int(data.get('month', 1))
+        
+        # We pakken het meest recente bestand uit de uploads map
+        upload_dir = os.path.join(os.path.dirname(__file__), 'uploads')
+        files = [f for f in os.listdir(upload_dir) if f.endswith('.csv')]
+        if not files:
+            return jsonify([])
+
+        latest_file = os.path.join(upload_dir, sorted(files, key=lambda x: os.path.getmtime(os.path.join(upload_dir, x)))[-1])
+        
+        # Inladen
+        df = pd.read_csv(latest_file)
+        
+        # Datum + Tijd conversie
+        df['datetime'] = pd.to_datetime(df['only_date'] + ' ' + df['only_time'])
+        df = df.set_index('datetime')
+        
+        # Filter op geselecteerde maand
+        df_month = df[df.index.month == target_month]
+        
+        # Groepeer per uur (0-23) en bereken gemiddeld verbruik en teruglevering per uur
+        hourly = df_month.groupby(df_month.index.hour)[['low_used_diff', 'normal_used_diff', 'low_returned_diff', 'normal_returned_diff']].mean(numeric_only=True)
+        
+        chart_data = []
+        for hour, row in hourly.iterrows():
+            verbruik = float(row.get('low_used_diff', 0)) + float(row.get('normal_used_diff', 0))
+            teruglevering = float(row.get('low_returned_diff', 0)) + float(row.get('normal_returned_diff', 0))
+            
+            chart_data.append({
+                "hour": int(hour), 
+                "verbruik": round(verbruik, 2),
+                "teruglevering": round(teruglevering, 2)
+            })
+        
+        # Sorteer op uur
+        chart_data.sort(key=lambda x: x['hour'])
+        
+        return jsonify(chart_data)
+    except Exception as e:
+        print(f"Uurgrafiek fout: {e}")
+        return jsonify([]), 500
+
+if __name__ == '__main__':
+    # Default to 5001 to avoid conflicts with other local services (e.g. AirPlay)
+    port = int(os.getenv('PORT', 5001))
+    print(f"\n⚡ Energy Backend Starting...")
+    print(f"🔗 Server: http://127.0.0.1:{port}")
+    print(f"📊 Status: http://127.0.0.1:{port}/")
+    print(f"✓ CORS enabled\n")
+    app.run(debug=True, port=5001, host='0.0.0.0')

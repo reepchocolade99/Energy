@@ -144,6 +144,7 @@ function HomePage({ onSubmit }) {
             monthlyConsumption: res.summary.monthlyConsumption,
             smartMeterData: res.summary,
             hourlyAnalytics: res.hourly_analytics || [],
+            consumptionSplit: res.consumption_split || {},
             variableCostsTotal: res.summary.variable_costs_total || 0,
             isFromSmartMeter: true
           });
@@ -533,4 +534,4 @@ function HomePage({ onSubmit }) {
   )
 }
 
-export default HomePage
+export default HomePage;

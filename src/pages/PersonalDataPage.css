@@ -369,3 +369,34 @@
     font-size: 1rem;
     outline: none;
 }
+
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.chart-title-group {
+  display: flex;
+  flex-direction: column; /* Stapelt de titel en het totaal boven elkaar op mobiel */
+  gap: 5px;
+}
+
+@media (min-width: 768px) {
+  .chart-title-group {
+    flex-direction: row; /* Naast elkaar op grotere schermen */
+    align-items: baseline;
+    gap: 15px;
+  }
+}
+
+.month-total-badge {
+  background-color: #f0f7e6;
+  color: #4a6d1d;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  border: 1px solid #96c63e;
+}

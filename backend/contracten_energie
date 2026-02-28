@@ -1,0 +1,32 @@
+Energieleverancier,Contract,Normaal,Dal,Extra Kosten,Aantal jaar
+"Vandebron",Dynamisch,"0,230","0,230","7,00",
+"NextEnergy",Dynamisch,"0,213","0,213","5,99",
+"Powerpeers",Dynamisch,"0,215","0,215","6,75",
+"Zonneplan",Dynamisch,"0,216","0,216","6,25",
+"Pure Energie",Dynamisch,"0,214","0,214","6,05",
+"Budget Energie",Dynamisch,"0,209","0,192","5,99",
+"Eneco",Dynamisch,"0,208","0,208","7,00",
+"Frank Energie",Dynamisch,"0,227","0,227","7,00",
+"Tibber",Dynamisch,"0,233","0,233","5,99",
+"EasyEnergy",Dynamisch,"0,246","0,246","7,00",
+"Vandebron",Variabel,"0,257","0,244","9,50",
+"Powerpeers",Variabel,"0,228","0,228","9,99",
+"Greenchoice",Variabel,"0,227","0,239","9,81",
+"Budget Energie",Variabel,"0,245","0,243","7,99",
+"Oxxio",Variabel,"0,239","0,237","9,49",
+"Eneco",Variabel,"0,245","0,240","9,99",
+"Vattenfall",Variabel,"0,264","0,299","8,99",
+"Essent",Variabel,"0,283","0,279","10,49",
+"Energiedirect",Vast,"0,233","0,220","15,97",1
+"Vattenfall",Vast,"0,218","0,218","16,98",1
+"Oxxio",Vast,"0,227","0,225","16,98",1
+"Essent",Vast,"0,226","0,223","17,49",1
+"Vandebron",Vast,"0,244","0,214","19,00",1
+"United Consumers",Vast,"0,250","0,216","18,58",1
+"Budget Energie",Vast,"0,231","0,231","17,98",1
+"Engie",Vast,"0,235","0,235","20,60",1
+"Eneco",Vast,"0,233","0,228","17,98",1
+"Energiedirect",Vast,"0,222","0,220","15,97",2
+"Innova Energie",Vast,"0,253","0,250","15,93",1
+"Vandebron",Vast,"0,241","0,210","19,00",2
+"Innova Energie",Vast,"0,247","0,242","15,93",3
