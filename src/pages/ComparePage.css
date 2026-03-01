@@ -1,24 +1,42 @@
+/* ==========================================================================
+   1. ALGEMENE LAYOUT & DASHBOARD
+   ========================================================================== */
 .compare-page {
   width: 100%;
   min-height: 100vh;
   padding: 20px;
-  background: #f4f7f1; /* Iets zachter grijs/groen voor de achtergrond */
+  background: #f4f7f1; /* Zacht grijs/groen */
   font-family: 'Inter', sans-serif;
+  display: flex; /* Nodig voor de sidebar layout */
+  gap: 30px;
 }
 
-.compare-container {
+.main-content {
+  flex: 1;
   max-width: 1200px;
   margin: 0 auto;
 }
 
-/* De groene header uit je oude stijl */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 80vh;
+  color: #96c63e;
+  font-weight: bold;
+}
+
+/* ==========================================================================
+   2. HEADER & NAVIGATIE
+   ========================================================================== */
 .header {
   margin-bottom: 40px;
-  position: relative;
-  background: #96c63e; /* Jouw specifieke groen */
   padding: 40px;
+  background: #96c63e;
   border-radius: 15px;
   box-shadow: 0 4px 15px rgba(150, 198, 62, 0.3);
+  position: relative;
 }
 
 .header h1 {
@@ -28,19 +46,25 @@
 }
 
 .comparison-info {
-  color: #ffffff; /* Wit op groen leest beter */
+  color: #ffffff;
   font-size: 16px;
   opacity: 0.9;
 }
 
+.split-info {
+  font-size: 0.85rem;
+  margin-top: 8px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
 .back-btn {
   background: white;
+  color: #96c63e;
   border: none;
   padding: 10px 20px;
   border-radius: 8px;
-  cursor: pointer;
   font-weight: 600;
-  color: #96c63e;
+  cursor: pointer;
   transition: all 0.3s;
   margin-bottom: 20px;
 }
@@ -50,7 +74,9 @@
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
 }
 
-/* De Grid layout voor de kaarten */
+/* ==========================================================================
+   3. CONTRACT GRIDS & CARDS
+   ========================================================================== */
 .contracts-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
@@ -61,188 +87,300 @@
 .contract-card {
   background: white;
   border-radius: 12px;
-  overflow: hidden;
-  transition: all 0.3s;
   border: 2px solid transparent;
+  padding: 25px;
   display: flex;
   flex-direction: column;
   box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+  transition: all 0.3s;
+  cursor: pointer;
 }
 
 .contract-card:hover {
   transform: translateY(-5px);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1);
   border-color: #96c63e;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1);
 }
 
-.card-header {
-  padding: 25px;
-  border-bottom: 1px solid #f0f0f0;
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
-
-.provider-icon {
-  font-size: 32px;
-  background: #f0f7e6;
-  width: 50px;
-  height: 50px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 10px;
-  color: #96c63e;
-}
-
-.card-header h3 {
-  margin: 0;
+.contract-card h3 {
+  margin: 0 0 5px 0;
   color: #373737;
   font-size: 20px;
 }
 
-.card-content {
-  padding: 25px;
-  flex: 1;
-}
-
-/* Prijssectie */
-.pricing-info {
-  margin-bottom: 20px;
-}
-
-.main-price-row {
-  text-align: center;
+.contract-card p {
+  color: #888;
+  font-size: 14px;
   margin-bottom: 15px;
 }
 
-.price-label {
-  display: block;
+.price-display {
+  color: #96c63e;
+  font-size: 32px;
+  font-weight: 800;
+  margin-bottom: 15px;
+}
+
+.price-display span {
   font-size: 14px;
   color: #666;
+  font-weight: normal;
+}
+
+.card-footer {
+  margin-top: auto;
+  padding-top: 15px;
+  font-size: 12px;
+  color: #96c63e;
+  font-weight: bold;
+  text-align: center;
+  border-top: 1px solid #f0f0f0;
+}
+
+/* ==========================================================================
+   4. DASHBOARD SECTIES (Top 3 & Ranges)
+   ========================================================================== */
+.best-options-container {
+  margin-bottom: 40px;
+  background-color: #f9f9f9;
+  padding: 20px;
+  border-radius: 12px;
+  border: 2px solid #96c63e;
+}
+
+.dashboard-title {
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 15px;
+  color: #333;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mini-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+}
+
+.mini-card-item {
+  background-color: #fff;
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+}
+
+.mini-ranking {
+  font-size: 14px;
+  font-weight: bold;
+  color: #666;
+}
+
+.mini-price-highlight {
+  font-size: 22px;
+  font-weight: bold;
+  color: #96c63e;
+  margin-top: 5px;
+}
+
+.mini-contract-name {
+  font-size: 12px;
+  color: #999;
+  margin-top: 5px;
+}
+
+/* Price Ranges Grid */
+.price-ranges-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+  margin-bottom: 40px;
+}
+
+.range-card {
+  padding: 15px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+}
+
+.range-card.dynamisch { background-color: #f0f8ff; border-color: #96c63e; }
+.range-card.variabel { background-color: #fff8f0; border-color: #ff9800; }
+.range-card.vast { background-color: #f0f7ff; border-color: #2196F3; }
+
+.range-title {
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 10px;
+  color: #333;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.range-info {
+  font-size: 14px;
+  color: #555;
   margin-bottom: 5px;
 }
 
-.price-amount {
-  color: #96c63e;
-  font-size: 36px;
-  font-weight: 800;
-}
-
-.price-period {
-  font-size: 16px;
-  color: #666;
-  font-weight: 400;
-}
-
-.yearly-total {
-  text-align: center;
-  font-size: 14px;
-  color: #888;
-  margin-bottom: 20px;
-}
-
-.rates-box {
-  background-color: #f9f9f9;
-  padding: 15px;
-  border-radius: 8px;
-  font-size: 14px;
-}
-
-.rate-row {
+/* ==========================================================================
+   5. FILTER NAVIGATIE
+   ========================================================================== */
+.filter-nav {
   display: flex;
-  justify-content: space-between;
-  color: #555;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 30px;
 }
 
-.rate-value {
-  font-weight: 600;
-  color: #373737;
-}
-
-.select-btn {
-  width: 100%;
-  padding: 15px;
-  background-color: #f0f0f0;
+.filter-nav button {
+  padding: 12px 24px;
   border: none;
-  border-radius: 0 0 10px 10px; /* Alleen onderkant afronden */
+  border-radius: 10px;
+  font-weight: 600;
   cursor: pointer;
-  font-weight: 700;
+  background: #fff;
   color: #666;
   transition: all 0.3s;
-  text-transform: uppercase;
-  letter-spacing: 1px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
-.contract-card:hover .select-btn {
-  background-color: #96c63e;
-  color: white;
-}
-
-/* Loading state */
-.loading-container {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  height: 80vh;
-  color: #96c63e;
-}
-
-/* Top Vergelijker Balk */
-.comparison-bar {
-  display: flex;
-  gap: 15px;
-  margin-bottom: 20px;
-  overflow-x: auto;
-  padding: 10px 5px;
-}
-
-.mini-card {
-  flex: 1;
-  min-width: 200px;
-  background: white;
-  padding: 20px;
-  border-radius: 12px;
-  border: 1px solid #e0e0e0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  position: relative;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-}
-
-.mini-card.cheapest {
-  border: 2px solid #96c63e;
-  background: #fafff0;
-}
-
-.winner-badge {
-  position: absolute;
-  top: -10px;
+.filter-nav button.active {
   background: #96c63e;
   color: white;
-  font-size: 11px;
-  padding: 3px 10px;
-  border-radius: 20px;
+}
+
+/* ==========================================================================
+   6. SIDEBAR (DETAILS)
+   ========================================================================== */
+.sidebar-container {
+  width: 42%;
+  max-width: 640px;
+  background-color: #ffffff;
+  padding: 30px;
+  box-shadow: -8px 0 24px rgba(0,0,0,0.1);
+  position: sticky;
+  top: 20px;
+  height: calc(100vh - 40px);
+  overflow-y: auto;
+  border-radius: 15px;
+  z-index: 100;
+}
+
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 25px;
+  border-bottom: 2px solid #f0f0f0;
+  padding-bottom: 15px;
+}
+
+.provider-name {
+  margin: 0;
+  color: #333;
+}
+
+.contract-label {
+  color: #888;
+  font-size: 14px;
+}
+
+.close-sidebar-btn {
+  background: #ff6b6b;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
   font-weight: bold;
 }
 
-.mini-provider {
-  font-weight: 700;
-  color: #373737;
-  margin-bottom: 8px;
+.chart-title {
+  font-size: 16px;
+  margin: 20px 0;
+  color: #444;
 }
 
-.mini-price {
-  font-size: 22px;
-  font-weight: 800;
+/* Controls & Toggles */
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin: 20px 0;
+}
+
+.month-select {
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  background: white;
+}
+
+.toggle-group {
+  display: flex;
+  gap: 10px;
+  background: #f0f0f0;
+  padding: 5px;
+  border-radius: 10px;
+}
+
+.toggle-group button {
+  flex: 1;
+  border: none;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.toggle-group button.active {
+  background: white;
   color: #96c63e;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-/* Hulpklasse voor de tekst onder de providernaam */
-.contract-name-sub {
-  margin: 0;
+/* Details Box binnen Sidebar */
+.details-box {
+  margin-top: 20px;
+  background-color: #e8f5e9;
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid #4caf50;
+}
+
+.details-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detail-item {
+  display: flex;
+  justify-content: space-between;
   font-size: 14px;
-  color: #888;
+  color: #2e7d32;
+}
+
+.detail-item strong {
+  font-size: 16px;
+}
+
+/* Responsive */
+@media (max-width: 1100px) {
+  .compare-page {
+    flex-direction: column;
+  }
+  .sidebar-container {
+    width: 100%;
+    max-width: none;
+    position: relative;
+    top: 0;
+    height: auto;
+  }
+  .mini-cards-grid, .price-ranges-grid {
+    grid-template-columns: 1fr;
+  }
 }

@@ -1,53 +1,92 @@
 import pandas as pd
 import os
 
-def calculate_energy_costs(input_csv_path):
-    # 1. Inladen van bestanden
-    df_input = pd.read_csv(input_csv_path)
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    prices_path = os.path.join(current_dir, 'data', 'Netherlands.csv')
-    
-    print(f"[DEBUG] Proberen prijsbestand te laden: {prices_path}")
-    try:
-        prices_netherlands = pd.read_csv(prices_path)
-        df_input = pd.read_csv(input_csv_path)
-    except FileNotFoundError:
-        print(f"[ERROR] Bestand niet gevonden op {prices_path}")
-        # Als backup: probeer het absolute pad naar de backend map te forceren
-        raise
-    
-    # 2. Prijzen voorbereiden (MWh naar kWh)
-    prices_netherlands['Price(Eur/kWh)'] = prices_netherlands['Price (EUR/MWhe)'] / 1000
-    prices_netherlands['Datetime (Local)'] = pd.to_datetime(prices_netherlands['Datetime (Local)'])
-    prices_netherlands.set_index('Datetime (Local)', inplace=True)
+class EnergyCalculator:
+    def __init__(self, input_csv_path):
+        self.current_dir = os.path.dirname(os.path.abspath(__file__))
+        self.input_path = input_csv_path
+        self.vastrecht_pm = 7.00
+        
+        # Paden naar data
+        self.prices_path = os.path.join(self.current_dir, 'data', 'Netherlands.csv')
+        self.dynamic_path = os.path.join(self.current_dir, 'data', 'dynamic_contracts.csv')
+        self.fixed_path = os.path.join(self.current_dir, 'data', 'vast_contract_energie.csv')
 
-    # 3. Input bestand naar datetime uren omzetten
-    # We combineren de datum en tijd kolom
-    df_input['datetime'] = pd.to_datetime(df_input['only_date'] + ' ' + df_input['only_time'])
-    df_input.set_index('datetime', inplace=True)
+    def _clean_price(self, val):
+        if isinstance(val, str):
+            return float(val.replace(',', '.'))
+        return val
 
-    # 4. Groeperen naar uren (Resample)
-    # We tellen de 'diff' waarden op per uur
-    df_hourly = df_input[['low_used_diff', 'normal_used_diff']].resample('h').sum()
+    def calculate(self):
+        """Voert de volledige berekening uit voor alle maanden in de data."""
+        # 1. Verbruik inladen
+        df = pd.read_csv(self.input_path)
+        df['datetime'] = pd.to_datetime(df['only_date'] + ' ' + df['only_time'])
+        df.set_index('datetime', inplace=True)
+        
+        # Groeperen per maand EN per uur voor de dynamische berekening
+        monthly_usage = df[['low_used_diff', 'normal_used_diff']].resample('ME').sum()
+        hourly_usage = df[['low_used_diff', 'normal_used_diff']].resample('h').sum()
 
-    # 5. Opslaan voor de check (tussenstap)
-    check_path = 'data/check_hourly_usage.csv'
-    df_hourly.to_csv(check_path)
-    print(f"Check-bestand opgeslagen in: {check_path}")
+        # 2. Spotprijzen inladen
+        prices_df = pd.read_csv(self.prices_path)
+        prices_df['Price(Eur/kWh)'] = prices_df['Price (EUR/MWhe)'] / 1000
+        prices_df['Datetime (Local)'] = pd.to_datetime(prices_df['Datetime (Local)'])
+        prices_df.set_index('Datetime (Local)', inplace=True)
 
-    # 6. Mergen met de prijzen
-    df_final = df_hourly.merge(
-        prices_netherlands[['Price(Eur/kWh)']], 
-        left_index=True, 
-        right_index=True, 
-        how='inner'
-    )
+        all_provider_results = []
 
-    # 7. De berekening: prijs * low + prijs * normal
-    opslag = 0.03795 
-    df_final['kosten_variabel_uur'] = (
-        ((df_final['Price(Eur/kWh)'] + opslag) * df_final['low_used_diff']) + 
-        ((df_final['Price(Eur/kWh)'] + opslag) * df_final['normal_used_diff'])
-    )
-    total_cost = df_final['kosten_variabel_uur'].sum() + (7 * 12) # + vastrecht
-    return total_cost, df_final
+        # --- DYNAMISCHE CONTRACTEN ---
+        if os.path.exists(self.dynamic_path):
+            dyn_providers = pd.read_csv(self.dynamic_path)
+            for _, provider in dyn_providers.iterrows():
+                name = provider['provider']
+                opslag = provider['surcharge_incl_vat']
+                
+                # Bereken kosten per uur
+                df_merged = hourly_usage.merge(prices_df[['Price(Eur/kWh)']], left_index=True, right_index=True)
+                df_merged['cost'] = ((df_merged['Price(Eur/kWh)'] + opslag) * (df_merged['low_used_diff'] + df_merged['normal_used_diff']))
+                
+                # Groeperen per maand
+                monthly_costs = df_merged['cost'].resample('ME').sum() + self.vastrecht_pm
+                monthly_usage_norm = df_merged['normal_used_diff'].resample('ME').sum()
+                monthly_usage_low = df_merged['low_used_diff'].resample('ME').sum()
+                all_provider_results.append({
+                    'provider': name,
+                    'type': 'Dynamisch',
+                    'monthly_breakdown': {
+                        m.month: {
+                            'totaal': round(c, 2),
+                            'verbruik_normaal': round(monthly_usage_norm[m], 2), # Nu met verbruik!
+                            'verbruik_dal': round(monthly_usage_low[m], 2)
+                        } for m, c in monthly_costs.items()
+                    },
+                    'total_year': round(monthly_costs.sum(), 2)
+                })
+        # --- VASTE & VARIABELE CONTRACTEN ---
+        if os.path.exists(self.fixed_path):
+            fixed_df = pd.read_csv(self.fixed_path)
+            for _, row in fixed_df.iterrows():
+                p_normal = self._clean_price(row['Normaal'])
+                p_dal = self._clean_price(row['Dal'])
+                label = 'Vast' if 'Vast' in row['Contract'] else 'Variabel'
+                
+                # Bereken kosten per maand op basis van werkelijk verbruik in die maand
+                monthly_detail = {}
+                for timestamp, usage in monthly_usage.iterrows():
+                    m_cost = (usage['low_used_diff'] * p_dal) + (usage['normal_used_diff'] * p_normal) + self.vastrecht_pm
+                    monthly_detail[timestamp.month] = round(m_cost, 2)
+                
+                all_provider_results.append({
+                    'provider': row['Energieleverancier'],
+                    'contract_name': row['Contract'],
+                    'type': label,
+                    'monthly_breakdown': monthly_detail,
+                    'total_year': round(sum(monthly_detail.values()), 2)
+                })
+
+        return all_provider_results
+
+# HOE TE GEBRUIKEN:
+# calculator = EnergyCalculator('usage.csv')
+# results = calculator.calculate()
