@@ -257,7 +257,7 @@ def upload_smart_meter():
         # Zoek de 'Zonneplan' of eerste dynamische resultaat voor de 'variable_costs_total'
         # Dit vervangt de oude total_variable_cost
         dynamic_res = next((r for r in all_results if r['type'] == 'Dynamisch'), all_results[0])
-        total_variable_cost = dynamic_res['total_year']
+        total_variable_cost = dynamic_res['total_year_costs']
 
         # 4. JSON Antwoord samenstellen
         response_data = {
@@ -301,19 +301,23 @@ def compare_contracts():
         # 2. Gebruik de NIEUWE calculator class
         calculator = EnergyCalculator(latest_file)
         full_results = calculator.calculate()
-
+        if full_results:
+            print(f"BACKEND CHECK: {full_results[0].keys()}")
         # 3. Omzetten naar het formaat dat je React frontend verwacht
         # De frontend verwacht 'monthlyCost' en 'yearlyCost'
+        # In app.py binnen compare_contracts
         formatted_results = []
         for res in full_results:
             formatted_results.append({
-                'provider': res['provider'],
-                'contractName': res.get('contract_name', res['type']),
-                'type': res['type'],
-                'monthlyCost': res['total_year'] / 12, # Gemiddelde voor de hoofdlijst
-                'yearlyCost': res['total_year'],
-                'monthly_breakdown': res['monthly_breakdown'], # Voor de maandelijkse details
-                'isVariable': res['type'] != 'Vast'
+                'provider': res.get('provider', 'Onbekend'),
+                'type': res.get('type', 'Onbekend'),
+                'monthlyCost': res.get('average_month_costs', 0), 
+                'yearlyCost': res.get('total_year_costs', 0),
+                'totalUsage': res.get('total_usage_combined', 0),
+                'lowUsage': res.get('total_usage_low', 0),
+                'normalUsage': res.get('total_usage_norm', 0),
+                'monthly_fixed': res.get('monthly_fixed', 0),
+                'monthly_breakdown': res.get('monthly_breakdown', {})
             })
 
         # Sorteren op goedkoopste jaarbedrag
@@ -343,7 +347,7 @@ def upload_file():
         
         # We pakken de 'total_year' van het eerste resultaat (meestal Zonneplan/Dynamisch)
         # als indicatie voor de variabele kosten
-        kosten = results[0]['total_year'] if results else 0
+        kosten = results[0]['total_year_costs'] if results else 0
         
         return {
             "variabele_kosten": round(kosten, 2),

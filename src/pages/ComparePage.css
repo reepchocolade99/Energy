@@ -384,3 +384,50 @@
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Container voor de stats onder de grafiek */
+.sidebar-stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Twee kolommen */
+    gap: 12px;
+    margin: 20px 0;
+    padding: 16px;
+    background-color: #f8f9fa; /* Lichtgrijze achtergrond voor contrast */
+    border-radius: 12px;
+    border: 1px solid #eee;
+}
+
+/* De titeltjes boven de bedragen (bijv. "Duurste maand") */
+.stat-label {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase; /* Alles in hoofdletters voor een moderne look */
+    letter-spacing: 0.5px;
+    color: #7f8c8d; /* Zachte grijstint */
+    margin-bottom: 4px;
+    font-weight: 600;
+}
+
+/* De bedragen zelf */
+.stat-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: #2c3e50; /* Donkerblauw/grijs voor leesbaarheid */
+}
+
+/* Specifieke styling voor het Jaartotaal (omdat deze belangrijker is) */
+.total-year {
+    grid-column: span 2; /* Neemt de volledige breedte in */
+    margin-top: 8px;
+    padding-top: 12px;
+    border-top: 1px dashed #ccc; /* Scheidingslijn */
+    display: flex;
+    justify-content: space-between; /* Label links, bedrag rechts */
+    align-items: center;
+}
+
+.total-year .stat-value {
+    font-size: 20px;
+    color: #96c63e; /* Jouw accentkleur */
+}

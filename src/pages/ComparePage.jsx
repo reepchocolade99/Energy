@@ -33,6 +33,10 @@ function ComparePage({ formData, onGoBack, onGoHome }) {
           ...c,
           monthlyCost: Number(c.monthlyCost) || 0,
           yearlyCost: Number(c.yearlyCost) || 0,
+          totalUsage: Number(c.totalUsage) || 0,
+          lowUsage: Number(c.lowUsage) || 0,
+          normalUsage: Number(c.normalUsage) || 0,
+          monthly_fixed: Number(c.monthly_fixed) || 0,
           monthly_breakdown: c.monthly_breakdown || {}
         }));
         setContracts(formatted);
@@ -74,6 +78,15 @@ function ComparePage({ formData, onGoBack, onGoHome }) {
     const prices = filtered.map(c => c.monthlyCost);
     return { min: Math.min(...prices), max: Math.max(...prices) };
   };
+  const stats = monthlyData.length > 0 ? {
+      maxMonth: monthlyData.reduce((prev, curr) => (prev.totaal > curr.totaal) ? prev : curr),
+      minMonth: monthlyData.reduce((prev, curr) => (prev.totaal < curr.totaal) ? prev : curr),
+      jaarTotaal: monthlyData.reduce((sum, curr) => sum + curr.totaal, 0),
+      vasteKosten: selectedContract.monthly_fixed || 7.00,
+      totaalVerbruik: selectedContract.totalUsage,
+      verbruikNormaal: selectedContract.normalUsage,
+      verbruikDal: selectedContract.lowUsage
+  } : null;
 
   return (
     <div className="compare-page">
@@ -133,19 +146,62 @@ function ComparePage({ formData, onGoBack, onGoHome }) {
           <div className="sidebar-content">
              <div className="chart-container">
                <ResponsiveContainer width="100%" height={250}>
-                  <LineChart data={monthlyData}>
+                  <LineChart 
+                    data={monthlyData} 
+                    onClick={(data) => data && setSelectedMonth(data.activeLabel)} // Update de geselecteerde maand
+                  >
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="month" />
-                    <YAxis hide />
-                    <Tooltip />
-                    <Line type="monotone" dataKey={viewMode === 'kosten' ? 'totaal' : 'verbruik_normaal'} stroke="#96c63e" strokeWidth={3} dot={false} />
+                    <YAxis hide domain={['auto', 'auto']} />
+                    <Tooltip 
+                      formatter={(value, name) => [
+                        viewMode === 'kosten' ? `€${value.toFixed(2)}` : `${value} kWh`, 
+                        viewMode === 'kosten' ? 'Kosten' : 'Verbruik'
+                      ]}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey={viewMode === 'kosten' ? 'totaal' : 'verbruik_normaal'} 
+                      stroke="#96c63e" 
+                      strokeWidth={3} 
+                      dot={{ r: 6 }} 
+                      activeDot={{ r: 8 }} 
+                    />
                   </LineChart>
                </ResponsiveContainer>
              </div>
+             
              <div className="toggle-group">
                 <button onClick={() => setViewMode('kosten')} className={viewMode === 'kosten' ? 'active' : ''}>Kosten</button>
                 <button onClick={() => setViewMode('verbruik')} className={viewMode === 'verbruik' ? 'active' : ''}>Verbruik</button>
              </div>
+             {stats && (
+                <div className="sidebar-stats-grid">
+                  {/* Item 1: Vaste kosten */}
+                  <div className="stat-item">
+                    <span className="stat-label">Vaste leveringskosten</span>
+                    <span className="stat-value">€{stats.vasteKosten.toFixed(2).replace('.', ',')}</span>
+                  </div>
+
+                  {/* Item 2: Jaartotaal */}
+                  <div className="stat-item">
+                    <span className="stat-label">Totaal per jaar</span>
+                    <span className="stat-value">€{stats.jaarTotaal.toFixed(2).replace('.', ',')}</span>
+                  </div>
+
+                  {/* Item 3: Duurste maand */}
+                  <div className="stat-item">
+                    <span className="stat-label">Duurste maand ({stats.maxMonth.month})</span>
+                    <span className="stat-value">€{stats.maxMonth.totaal.toFixed(2).replace('.', ',')}</span>
+                  </div>
+
+                  {/* Item 4: Goedkoopste maand */}
+                  <div className="stat-item">
+                    <span className="stat-label">Goedkoopste maand ({stats.minMonth.month})</span>
+                    <span className="stat-value">€{stats.minMonth.totaal.toFixed(2).replace('.', ',')}</span>
+                  </div>
+                </div>
+              )}          
              {selectedMonth && <MonthDetails data={monthlyData.find(m => m.month === selectedMonth)} month={selectedMonth} />}
           </div>
         </aside>
