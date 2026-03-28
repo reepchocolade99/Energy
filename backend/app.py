@@ -11,14 +11,12 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Use flask-cors middleware for API routes (only allow Vite frontend)
-# This provides the Access-Control-* headers automatically for routes under /api/*
-# Temporarily allow all origins for debugging CORS issues. Change back to specific origin after debugging.
+# Use flask-cors middleware for API routes
 CORS(app, resources={
     r"/api/*": {
-        "origins": "*",
+        "origins": ["http://localhost:5173", "http://127.0.0.1:5173"],
         "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type"]
+        "allow_headers": ["Content-Type", "Authorization"]
     }
 })
 # Debug: log incoming requests (does not modify responses)
@@ -196,8 +194,10 @@ def root():
             <div class="info">
                 <h3>API Endpoints:</h3>
                 <div class="endpoint">GET /health</div>
-                <div class="endpoint">POST /api/upload-smart-meter</div>
-                <div class="endpoint">POST /api/calculate-savings</div>
+                <div class="endpoint">GET /api/load-local-data</div>
+                <div class="endpoint">POST /api/compare-contracts</div>
+                <div class="endpoint">POST /api/monthly-detail</div>
+                <div class="endpoint">POST /api/hourly-detail</div>
             </div>
             
             <div class="info">
@@ -213,57 +213,150 @@ def root():
     return html, 200
 
 
-@app.route('/api/upload-smart-meter', methods=['POST'])
-def upload_smart_meter():
+# @app.route('/api/upload-smart-meter', methods=['POST'])
+# def upload_smart_meter():
+#     try:
+#         print("[DEBUG] upload_smart_meter called", flush=True)
+#         if 'file' not in request.files:
+#             return jsonify({'error': 'Geen bestand gevonden'}), 400
+#         
+#         file = request.files['file']
+#         upload_dir = os.path.join(os.path.dirname(__file__), 'uploads')
+#         os.makedirs(upload_dir, exist_ok=True)
+#         saved_path = os.path.join(upload_dir, secure_filename(file.filename))
+#         file.save(saved_path)
+#         
+#         # 1. Gebruik de nieuwe calculator voor de data verwerking
+#         # We maken een instantie aan om toegang te krijgen tot de interne dataframes
+#         calc = EnergyCalculator(saved_path)
+#         all_results = calc.calculate() # Bereken alle contract opties
+#         
+#         # We hebben het verwerkte dataframe nodig voor de grafieken
+#         # Hiervoor moeten we even een kleine helper methode aanroepen of toevoegen aan de class
+#         df = pd.read_csv(saved_path)
+#         df['datetime'] = pd.to_datetime(df['only_date'] + ' ' + df['only_time'])
+#         df = df.set_index('datetime')
+#         
+#         # 2. VERBRUIK STATISTIEKEN
+#         total_kwh = float(df['low_used_diff'].sum() + df['normal_used_diff'].sum())
+#         start_date = df.index.min()
+#         end_date = df.index.max()
+#         num_days = (end_date - start_date).days or 1
+#         
+#         avg_daily = total_kwh / num_days
+#         monthly_val = avg_daily * 30.44 
+# 
+#         # 3. Hourly analytics (voor de profiel-grafiek)
+#         hourly_avg = df.groupby(df.index.hour).mean(numeric_only=True)
+#         hourly_data = {
+#             str(int(hour)): {
+#                 'diff': float(row['low_used_diff'] + row['normal_used_diff'])
+#             } for hour, row in hourly_avg.iterrows()
+#         }
+#         
+#         # Zoek de 'Zonneplan' of eerste dynamische resultaat voor de 'variable_costs_total'
+#         # Dit vervangt de oude total_variable_cost
+#         dynamic_res = next((r for r in all_results if r['type'] == 'Dynamisch'), all_results[0])
+#         total_variable_cost = dynamic_res['total_year_costs']
+# 
+#         # 4. JSON Antwoord samenstellen
+#         response_data = {
+#             'success': True,
+#             'isFromSmartMeter': True,
+#             'smartMeterData': { # Belangrijk voor PersonalDataPage.jsx
+#                 'total_kwh': total_kwh,
+#                 'average_daily_consumption': avg_daily,
+#                 'date_range_start': str(start_date),
+#                 'date_range_end': str(end_date)
+#             },
+#             'summary': {
+#                 'total_kwh': total_kwh,
+#                 'monthlyConsumption': monthly_val, 
+#                 'variable_costs_total': total_variable_cost,
+#             },
+#             'hourly_analytics': hourly_data,
+#             'consumption_split': {
+#                 'monthly_normal_used': (df['normal_used_diff'].sum() / num_days) * 30.44,
+#                 'monthly_low_used': (df['low_used_diff'].sum() / num_days) * 30.44
+#             }
+#         }
+#         
+#         return jsonify(response_data), 200
+#         
+#     except Exception as e:
+#         print(f"[ERROR] {traceback.format_exc()}")
+#         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/overview-usage', methods=['GET'])
+def overview_usage():
+    """Load combined_data.csv from backend/uploads and run EnergyCalculator."""
     try:
-        print("[DEBUG] upload_smart_meter called", flush=True)
-        if 'file' not in request.files:
-            return jsonify({'error': 'Geen bestand gevonden'}), 400
-        
-        file = request.files['file']
-        upload_dir = os.path.join(os.path.dirname(__file__), 'uploads')
-        os.makedirs(upload_dir, exist_ok=True)
-        saved_path = os.path.join(upload_dir, secure_filename(file.filename))
-        file.save(saved_path)
-        
-        # 1. Gebruik de nieuwe calculator voor de data verwerking
-        # We maken een instantie aan om toegang te krijgen tot de interne dataframes
-        calc = EnergyCalculator(saved_path)
-        all_results = calc.calculate() # Bereken alle contract opties
-        
-        # We hebben het verwerkte dataframe nodig voor de grafieken
-        # Hiervoor moeten we even een kleine helper methode aanroepen of toevoegen aan de class
-        df = pd.read_csv(saved_path)
-        df['datetime'] = pd.to_datetime(df['only_date'] + ' ' + df['only_time'])
-        df = df.set_index('datetime')
-        
-        # 2. VERBRUIK STATISTIEKEN
-        total_kwh = float(df['low_used_diff'].sum() + df['normal_used_diff'].sum())
+        csv_path = os.path.join(os.path.dirname(__file__), 'uploads', 'combined_data.csv')
+        if not os.path.exists(csv_path):
+            return jsonify({'error': 'combined_data.csv niet gevonden in backend/uploads'}), 404
+
+        calculator = EnergyCalculator(csv_path)
+        results = calculator.calculate()
+
+        # Als de calculator niets teruggeeft, is er mogelijk iets mis
+        if not results:
+            return jsonify({'error': 'Geen verbruiksresultaten (leeg of onjuist bestand)'}), 500
+
+        # Samenvatting van het verbruik uit de gecombineerde CSV:
+        total_usage = sum([r.get('total_usage_combined', 0) for r in results])
+        avg_monthly_cost = sum([r.get('average_month_costs', 0) for r in results]) / len(results)
+
+        return jsonify({
+            'success': True,
+            'totalUsageKWh': total_usage,
+            'avgMonthlyCostEuro': round(avg_monthly_cost, 2),
+            'providerResults': results,
+            'message': 'Data geladen via backend/uploads/combined_data.csv'
+        }), 200
+    except Exception as e:
+        print(f"[ERROR] overview_usage: {traceback.format_exc()}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/load-local-data', methods=['GET'])
+def load_local_data():
+    try:
+        file_path = os.path.join(os.path.dirname(__file__), 'uploads', 'combined_data.csv')
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'Bestand combined_data.csv niet gevonden in uploads map'}), 404
+
+        # Use EnergyCalculator to process the data
+        calc = EnergyCalculator(file_path)
+        all_results = calc.calculate()
+
+        # Process the dataframe using shaping_df for consistency
+        df = pd.read_csv(file_path)
+        df = shaping_df(df, unit='kWh')
+
+        # Calculate statistics
+        total_kwh = float(df['diff'].sum())  # Use 'diff' as per shaping_df
         start_date = df.index.min()
         end_date = df.index.max()
         num_days = (end_date - start_date).days or 1
-        
         avg_daily = total_kwh / num_days
-        monthly_val = avg_daily * 30.44 
+        monthly_val = avg_daily * 30.44
 
-        # 3. Hourly analytics (voor de profiel-grafiek)
+        # Hourly analytics
         hourly_avg = df.groupby(df.index.hour).mean(numeric_only=True)
         hourly_data = {
             str(int(hour)): {
-                'diff': float(row['low_used_diff'] + row['normal_used_diff'])
-            } for hour, row in hourly_avg.iterrows()
+                'diff': float(hourly_avg.loc[hour, 'diff']) if 'diff' in hourly_avg.columns else 0
+            } for hour in range(24) if hour in hourly_avg.index
         }
-        
-        # Zoek de 'Zonneplan' of eerste dynamische resultaat voor de 'variable_costs_total'
-        # Dit vervangt de oude total_variable_cost
-        dynamic_res = next((r for r in all_results if r['type'] == 'Dynamisch'), all_results[0])
-        total_variable_cost = dynamic_res['total_year_costs']
 
-        # 4. JSON Antwoord samenstellen
+        # Get variable costs from dynamic result
+        dynamic_res = next((r for r in all_results if r['type'] == 'Dynamisch'), all_results[0]) if all_results else {}
+        total_variable_cost = dynamic_res.get('total_year_costs', 0)
+
+        # Return the full JSON structure expected by frontend
         response_data = {
             'success': True,
             'isFromSmartMeter': True,
-            'smartMeterData': { # Belangrijk voor PersonalDataPage.jsx
+            'smartMeterData': {
                 'total_kwh': total_kwh,
                 'average_daily_consumption': avg_daily,
                 'date_range_start': str(start_date),
@@ -271,18 +364,18 @@ def upload_smart_meter():
             },
             'summary': {
                 'total_kwh': total_kwh,
-                'monthlyConsumption': monthly_val, 
+                'monthlyConsumption': monthly_val,
                 'variable_costs_total': total_variable_cost,
             },
             'hourly_analytics': hourly_data,
             'consumption_split': {
-                'monthly_normal_used': (df['normal_used_diff'].sum() / num_days) * 30.44,
-                'monthly_low_used': (df['low_used_diff'].sum() / num_days) * 30.44
-            }
+                'monthly_normal_used': (df['normal_used_diff'].sum() / num_days) * 30.44 if 'normal_used_diff' in df.columns else 0,
+                'monthly_low_used': (df['low_used_diff'].sum() / num_days) * 30.44 if 'low_used_diff' in df.columns else 0
+            },
+            'results': all_results
         }
-        
+
         return jsonify(response_data), 200
-        
     except Exception as e:
         print(f"[ERROR] {traceback.format_exc()}")
         return jsonify({'error': str(e)}), 500
@@ -290,22 +383,18 @@ def upload_smart_meter():
 @app.route('/api/compare-contracts', methods=['POST'])
 def compare_contracts():
     try:
-        # 1. Zoek het meest recente geüploade bestand
-        upload_dir = os.path.join(os.path.dirname(__file__), 'uploads')
-        files = [f for f in os.listdir(upload_dir) if f.endswith('.csv')]
-        if not files:
-            return jsonify({"error": "Upload eerst een bestand voor een nauwkeurige vergelijking."}), 400
+        # Use combined_data.csv as the default source
+        latest_file = os.path.join(os.path.dirname(__file__), 'uploads', 'combined_data.csv')
+        if not os.path.exists(latest_file):
+            return jsonify({"error": "combined_data.csv niet gevonden in uploads map."}), 404
 
-        latest_file = os.path.join(upload_dir, sorted(files, key=lambda x: os.path.getmtime(os.path.join(upload_dir, x)))[-1])
-
-        # 2. Gebruik de NIEUWE calculator class
+        # Use the NEW calculator class
         calculator = EnergyCalculator(latest_file)
         full_results = calculator.calculate()
         if full_results:
             print(f"BACKEND CHECK: {full_results[0].keys()}")
-        # 3. Omzetten naar het formaat dat je React frontend verwacht
-        # De frontend verwacht 'monthlyCost' en 'yearlyCost'
-        # In app.py binnen compare_contracts
+        # Convert to the format expected by React frontend
+        # Frontend expects 'monthlyCost' and 'yearlyCost'
         formatted_results = []
         for res in full_results:
             formatted_results.append({
@@ -320,7 +409,7 @@ def compare_contracts():
                 'monthly_breakdown': res.get('monthly_breakdown', {})
             })
 
-        # Sorteren op goedkoopste jaarbedrag
+        # Sort by cheapest yearly cost
         sorted_results = sorted(formatted_results, key=lambda x: x['yearlyCost'])
         
         return jsonify(sorted_results)
@@ -564,13 +653,10 @@ def monthly_detail():
         data = request.json
         target_month = int(data.get('month', 1))
         
-        # We pakken het meest recente bestand uit de uploads map
-        upload_dir = os.path.join(os.path.dirname(__file__), 'uploads')
-        files = [f for f in os.listdir(upload_dir) if f.endswith('.csv')]
-        if not files:
+        # Use combined_data.csv as the source
+        latest_file = os.path.join(os.path.dirname(__file__), 'uploads', 'combined_data.csv')
+        if not os.path.exists(latest_file):
             return jsonify([])
-
-        latest_file = os.path.join(upload_dir, sorted(files, key=lambda x: os.path.getmtime(os.path.join(upload_dir, x)))[-1])
         
         # Inladen
         df = pd.read_csv(latest_file)
@@ -615,13 +701,10 @@ def hourly_detail():
         data = request.json
         target_month = int(data.get('month', 1))
         
-        # We pakken het meest recente bestand uit de uploads map
-        upload_dir = os.path.join(os.path.dirname(__file__), 'uploads')
-        files = [f for f in os.listdir(upload_dir) if f.endswith('.csv')]
-        if not files:
+        # Use combined_data.csv as the source
+        latest_file = os.path.join(os.path.dirname(__file__), 'uploads', 'combined_data.csv')
+        if not os.path.exists(latest_file):
             return jsonify([])
-
-        latest_file = os.path.join(upload_dir, sorted(files, key=lambda x: os.path.getmtime(os.path.join(upload_dir, x)))[-1])
         
         # Inladen
         df = pd.read_csv(latest_file)

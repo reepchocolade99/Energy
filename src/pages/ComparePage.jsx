@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import './ComparePage.css'; // ZORG DAT DIT BESTAND BESTAAT
 
-function ComparePage({ formData, onGoBack, onGoHome }) {
+function ComparePage() {
   const [contracts, setContracts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedType, setSelectedType] = useState('Dynamisch');
@@ -10,26 +10,19 @@ function ComparePage({ formData, onGoBack, onGoHome }) {
   const [monthlyData, setMonthlyData] = useState([]);
   const [selectedMonth, setSelectedMonth] = useState(null);
   const [viewMode, setViewMode] = useState('verbruik');
+  const [monthlyConsumption, setMonthlyConsumption] = useState(0);
 
   const fetchContracts = async () => {
-    if (!formData || !formData.monthlyConsumption) {
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:5001/api/compare-contracts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          monthlyNormalUsed: formData?.consumptionSplit?.monthly_normal_used || 0,
-          monthlyLowUsed: formData?.consumptionSplit?.monthly_low_used || 0
-        })
+      const response = await fetch('/api/load-local-data', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
       });
       if (!response.ok) throw new Error(`Server fout: ${response.status}`);
-      const apiData = await response.json();
-      if (Array.isArray(apiData)) {
-        const formatted = apiData.map(c => ({
+      const data = await response.json();
+      if (data.results && Array.isArray(data.results)) {
+        const formatted = data.results.map(c => ({
           ...c,
           monthlyCost: Number(c.monthlyCost) || 0,
           yearlyCost: Number(c.yearlyCost) || 0,
@@ -40,6 +33,9 @@ function ComparePage({ formData, onGoBack, onGoHome }) {
           monthly_breakdown: c.monthly_breakdown || {}
         }));
         setContracts(formatted);
+        // Calculate total monthly consumption
+        const totalMonthly = (data.consumption_split?.monthly_normal_used || 0) + (data.consumption_split?.monthly_low_used || 0);
+        setMonthlyConsumption(totalMonthly);
       }
     } catch (error) {
       console.error("Netwerkfout:", error);
@@ -49,7 +45,7 @@ function ComparePage({ formData, onGoBack, onGoHome }) {
     }
   };
 
-  useEffect(() => { fetchContracts(); }, [formData]);
+  useEffect(() => { fetchContracts(); }, []);
 
   const handleContractClick = (contract) => {
     const monthNames = ['Jan', 'Feb', 'Mrt', 'Apr', 'Mei', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec'];
@@ -92,10 +88,9 @@ function ComparePage({ formData, onGoBack, onGoHome }) {
     <div className="compare-page">
       <div className="compare-container">
         <header className="header">
-          <button onClick={onGoBack} className="back-btn">← Terug</button>
           <h1>Beste deals voor jou</h1>
           <p className="comparison-info">
-            Verbruik: <strong>{Math.round(formData?.monthlyConsumption || 0)} kWh</strong>/mnd
+            Verbruik: <strong>{Math.round(monthlyConsumption)} kWh</strong>/mnd
           </p>
         </header>
 

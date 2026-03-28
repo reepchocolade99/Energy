@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useState } from 'react'
 import ComparePage from './pages/ComparePage'
 import PersonalDataPage from './pages/PersonalDataPage'
-import OverviewPage from './pages/OverviewPage'
 import './App.css'
 
 function App() {
@@ -12,14 +11,7 @@ function App() {
     <BrowserRouter>
       <div className="app">
         <Routes>
-          <Route path="/" element={<OverviewPage />} />
-          <Route path="/personal" element={
-            <PersonalDataPage
-              formData={formData}
-              onGoHome={() => window.location.href = '/'}
-              onSwitchTab={() => window.location.href = '/compare'}
-            />
-          } />
+          <Route path="/" element={<PersonalDataPage />} />
           <Route path="/compare" element={
             <ComparePage
               formData={formData}

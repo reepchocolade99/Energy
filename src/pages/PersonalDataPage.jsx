@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react'
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, Legend } from 'recharts'
 import './PersonalDataPage.css'
 
-function PersonalDataPage({ formData, onGoHome, onSwitchTab }) {
+function PersonalDataPage() {
   const [analyticsData, setAnalyticsData] = useState(null)
   const [error, setError] = useState(null)
+  const [loading, setLoading] = useState(true)
   
   // Grafiek states
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
@@ -21,12 +22,49 @@ function PersonalDataPage({ formData, onGoHome, onSwitchTab }) {
 
   // Initialisatie van data
   useEffect(() => {
-    if (!formData?.smartMeterData) {
-      setError('Geen slimme meter data beschikbaar. Upload eerst een bestand.')
-      return
+    const loadData = async () => {
+      setLoading(true)
+      setError(null)
+
+      try {
+        console.log('Starting fetch to load-local-data...')
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
+
+        const res = await fetch('/api/load-local-data', {
+          signal: controller.signal,
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        })
+        
+        clearTimeout(timeoutId)
+        console.log('Fetch response status:', res.status)
+        
+        if (!res.ok) {
+          const errJson = await res.json().catch(() => ({}))
+          throw new Error(errJson.error || `HTTP ${res.status}: ${res.statusText}`)
+        }
+
+        const data = await res.json()
+        console.log('Data received:', data)
+        setAnalyticsData(data)
+      } catch (e) {
+        console.error('Frontend Error:', e)
+        if (e.name === 'AbortError') {
+          setError('Request timeout - check if backend is running')
+        } else {
+          setError(e.message || 'Fout bij laden data')
+        }
+        setAnalyticsData(null)
+      } finally {
+        setLoading(false)
+      }
     }
-    setAnalyticsData(formData)
-  }, [formData])
+
+    loadData()
+  }, [])
 
   // Effect om grafiek data op te halen
   useEffect(() => {
@@ -38,7 +76,7 @@ function PersonalDataPage({ formData, onGoHome, onSwitchTab }) {
   const fetchDailyData = async (month) => {
     setLoadingChart(true)
     try {
-      const response = await fetch('http://localhost:5001/api/monthly-detail', {
+      const response = await fetch('/api/monthly-detail', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ month: month })
@@ -64,7 +102,7 @@ function PersonalDataPage({ formData, onGoHome, onSwitchTab }) {
   const fetchHourlyData = async (month) => {
     setLoadingHourlyChart(true)
     try {
-      const response = await fetch('http://localhost:5001/api/hourly-detail', {
+      const response = await fetch('/api/hourly-detail', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ month: month })
@@ -79,16 +117,29 @@ function PersonalDataPage({ formData, onGoHome, onSwitchTab }) {
   }
 
   // Loading/Empty State
+  if (loading) {
+    return (
+      <div className="personal-data-page">
+        <div className="container">
+          <div className="empty-state">
+            <p className="empty-icon">📊</p>
+            <h2>Gegevens laden...</h2>
+            <p>Data wordt opgehaald uit de lokale database.</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (!analyticsData) {
     return (
       <div className="personal-data-page">
         <div className="container">
-          <button className="back-btn" onClick={onGoHome}>← Terug</button>
           <div className="empty-state">
             <p className="empty-icon">📊</p>
             <h2>Geen Data Beschikbaar</h2>
-            <p>{error || 'Gegevens laden...'}</p>
-            <button className="upload-btn" onClick={onGoHome}>Bestand Uploaden</button>
+            <p>{error || 'Er is een fout opgetreden bij het laden van de gegevens.'}</p>
+            <button className="upload-btn" onClick={() => window.location.reload()}>Opnieuw Proberen</button>
           </div>
         </div>
       </div>
@@ -118,7 +169,6 @@ function PersonalDataPage({ formData, onGoHome, onSwitchTab }) {
     <div className="personal-data-page">
       <div className="personal-container">
         <div className="header">
-          <button className="back-btn" onClick={onGoHome}>← Terug</button>
           <h1>⚡ Jouw Energieverbruik Profiel</h1>
           <p className="subtitle">
             Periode: {summary?.date_range_start?.split(' ')[0]} tot {summary?.date_range_end?.split(' ')[0]}
@@ -299,8 +349,7 @@ function PersonalDataPage({ formData, onGoHome, onSwitchTab }) {
         </table>
 
         <div className="action-buttons">
-          <button className="compare-btn" onClick={onSwitchTab}>⚖️ Vergelijk Contracten</button>
-          <button className="new-file-btn" onClick={onGoHome}>📤 Nieuw Bestand</button>
+          <button className="compare-btn" onClick={() => window.location.href = '/compare'}>⚖️ Vergelijk Contracten</button>
         </div>
       </div>
     </div>
