@@ -6,7 +6,7 @@
   min-height: 100vh;
   padding: 20px;
   background: #f4f7f1; /* Zacht grijs/groen */
-  font-family: 'Inter', sans-serif;
+  font-family: 'Mulish';
   display: flex; /* Nodig voor de sidebar layout */
   gap: 30px;
 }

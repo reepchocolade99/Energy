@@ -1,285 +1,270 @@
 import { useState, useEffect } from 'react'
-import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, Legend } from 'recharts'
 import './PersonalDataPage.css'
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, Legend } from 'recharts'
 
 function PersonalDataPage() {
   const [analyticsData, setAnalyticsData] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [dailyData, setDailyData] = useState([])
+  const [hourlyChartData, setHourlyChartData] = useState([])
   
-  // Grafiek states
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
-  const [chartData, setChartData] = useState([])
   const [showChart, setShowChart] = useState(false)
   const [loadingChart, setLoadingChart] = useState(false)
-  const [selectedMonthTotal, setSelectedMonthTotal] = useState(0)
 
-  // Hourly usage states
   const [selectedMonthHourly, setSelectedMonthHourly] = useState(new Date().getMonth() + 1)
-  const [hourlyChartData, setHourlyChartData] = useState([])
   const [showHourlyChart, setShowHourlyChart] = useState(false)
   const [loadingHourlyChart, setLoadingHourlyChart] = useState(false)
 
-  // Initialisatie van data
+  // Initial data fetch
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true)
-      setError(null)
-
+    const fetchMainData = async () => {
       try {
-        console.log('Starting fetch to load-local-data...')
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
-
-        const res = await fetch('/api/load-local-data', {
-          signal: controller.signal,
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          }
-        })
-        
-        clearTimeout(timeoutId)
-        console.log('Fetch response status:', res.status)
-        
-        if (!res.ok) {
-          const errJson = await res.json().catch(() => ({}))
-          throw new Error(errJson.error || `HTTP ${res.status}: ${res.statusText}`)
-        }
-
+        setLoading(true)
+        const res = await fetch(`http://127.0.0.1:5001/api/load-local-data`)
+        if (!res.ok) throw new Error(`Server fout (Status: ${res.status})`)
         const data = await res.json()
-        console.log('Data received:', data)
         setAnalyticsData(data)
-      } catch (e) {
-        console.error('Frontend Error:', e)
-        if (e.name === 'AbortError') {
-          setError('Request timeout - check if backend is running')
-        } else {
-          setError(e.message || 'Fout bij laden data')
+        
+        if (data.smartMeterData?.date_range_start) {
+          const firstMonth = new Date(data.smartMeterData.date_range_start).getMonth() + 1
+          setSelectedMonth(firstMonth)
+          setSelectedMonthHourly(firstMonth)
         }
-        setAnalyticsData(null)
+      } catch (err) {
+        setError(err.message)
       } finally {
         setLoading(false)
       }
     }
-
-    loadData()
+    fetchMainData()
   }, [])
 
-  // Effect om grafiek data op te halen
   useEffect(() => {
-    if (showChart && analyticsData) {
-      fetchDailyData(selectedMonth)
+    if (!showChart) return
+    const fetchDailyDetails = async () => {
+      setLoadingChart(true)
+      try {
+        const res = await fetch(`http://127.0.0.1:5001/api/month-detail/${selectedMonth}`)
+        const data = await res.json()
+        
+        if (Array.isArray(data)) {
+          const cleanedData = data.map(item => ({
+            ...item,
+            verbruik: Math.max(0, item.verbruik || 0),
+            teruglevering: Math.abs(item.teruglevering || 0) < 0.001 ? 0 : Math.abs(item.teruglevering)
+          }))
+          setDailyData(cleanedData)
+        } else {
+          setDailyData([])
+        }
+      } catch (err) {
+        console.error("Fout bij ophalen maanddata:", err)
+        setDailyData([])
+      } finally {
+        setLoadingChart(false)
+      }
     }
-  }, [selectedMonth, showChart, analyticsData])
+    fetchDailyDetails()
+  }, [selectedMonth, showChart])
 
-  const fetchDailyData = async (month) => {
-    setLoadingChart(true)
-    try {
-      const response = await fetch('/api/monthly-detail', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ month: month })
-      })
-      const data = await response.json()
-      const totaalMaand = data.reduce((acc, dag) => acc + (dag.verbruik || 0), 0)
-      setChartData(data)
-      setSelectedMonthTotal(totaalMaand)
-    } catch (err) {
-      console.error("Fout bij ophalen grafiekdata:", err)
-    } finally {
-      setLoadingChart(false)
-    }
-  }
-
-  // Effect om uurgrafiek data op te halen
   useEffect(() => {
-    if (showHourlyChart && analyticsData) {
-      fetchHourlyData(selectedMonthHourly)
+    if (!showHourlyChart) return
+    const fetchHourly = async () => {
+      setLoadingHourlyChart(true)
+      try {
+        const res = await fetch(`http://127.0.0.1:5001/api/hourly-detail/${selectedMonthHourly}`)
+        const data = await res.json()
+        
+        if (data && typeof data === 'object' && !Array.isArray(data)) {
+          const chartArray = Object.keys(data).map(hourKey => ({
+            hour: parseInt(hourKey),
+            verbruik: data[hourKey].verbruik || 0,
+            teruglevering: Math.abs(data[hourKey].teruglevering || 0)
+          }));
+
+          chartArray.sort((a, b) => a.hour - b.hour);
+          
+          setHourlyChartData(chartArray);
+        } else if (Array.isArray(data)) {
+          setHourlyChartData(data);
+        }
+      } catch (err) {
+        console.error("Fout bij laden uurgegevens:", err)
+      } finally {
+        setLoadingHourlyChart(false)
+      }
     }
-  }, [selectedMonthHourly, showHourlyChart, analyticsData])
+    fetchHourly()
+  }, [selectedMonthHourly, showHourlyChart])
 
-  const fetchHourlyData = async (month) => {
-    setLoadingHourlyChart(true)
-    try {
-      const response = await fetch('/api/hourly-detail', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ month: month })
-      })
-      const data = await response.json()
-      setHourlyChartData(data)
-    } catch (err) {
-      console.error("Fout bij ophalen uurgrafiekdata:", err)
-    } finally {
-      setLoadingHourlyChart(false)
-    }
-  }
+  if (loading) return <div className="personal-data-page"><div className="empty-state"><h2>Laden...</h2></div></div>
+  if (error) return <div className="personal-data-page"><div className="empty-state"><h2>Fout: {error}</h2></div></div>
+  if (!analyticsData) return null
 
-  // Loading/Empty State
-  if (loading) {
-    return (
-      <div className="personal-data-page">
-        <div className="container">
-          <div className="empty-state">
-            <p className="empty-icon">📊</p>
-            <h2>Gegevens laden...</h2>
-            <p>Data wordt opgehaald uit de lokale database.</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (!analyticsData) {
-    return (
-      <div className="personal-data-page">
-        <div className="container">
-          <div className="empty-state">
-            <p className="empty-icon">📊</p>
-            <h2>Geen Data Beschikbaar</h2>
-            <p>{error || 'Er is een fout opgetreden bij het laden van de gegevens.'}</p>
-            <button className="upload-btn" onClick={() => window.location.reload()}>Opnieuw Proberen</button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Variabelen definiëren
   const summary = analyticsData.smartMeterData || {}
-  const hourlyData = analyticsData.hourlyAnalytics || {}
-  const avgDaily = summary.average_daily_consumption || 0
-  const totalConsumption = summary.total_kwh || 0
-  const monthlyConsumption = analyticsData.monthlyConsumption || 0
-
-  // Logica voor Piek- en Laagste uur
-  const hours = Object.keys(hourlyData)
-  const peakHour = hours.length > 0 
-    ? hours.reduce((a, b) => (hourlyData[a]?.diff > hourlyData[b]?.diff ? a : b)) 
-    : "N/A"
-  
-  const lowestHour = hours.length > 0 
-    ? hours.reduce((a, b) => (hourlyData[a]?.diff < hourlyData[b]?.diff ? a : b)) 
-    : "N/A"
-
+  const hourlyDataMap = analyticsData.hourly_analytics || {} 
   const maanden = ["Januari", "Februari", "Maart", "April", "Mei", "Juni", "Juli", "Augustus", "September", "Oktober", "November", "December"]
+
+  const hours = Object.keys(hourlyDataMap);
+
+  // 1. Hoogste verbruik: waar is 'verbruik' het grootst?
+  const peakHour = hours.length > 0 
+    ? hours.reduce((a, b) => (
+        (hourlyDataMap[a]?.verbruik || 0) > (hourlyDataMap[b]?.verbruik || 0) ? a : b
+      )) 
+    : "00";
+
+  // 2. Gunstigste moment: waar is de (absolute) teruglevering het hoogst?
+  const bestHour = hours.length > 0 
+    ? hours.reduce((a, b) => (
+        Math.abs(hourlyDataMap[a]?.teruglevering || 0) > Math.abs(hourlyDataMap[b]?.teruglevering || 0) ? a : b
+      )) 
+    : "00";
 
   return (
     <div className="personal-data-page">
       <div className="personal-container">
         <div className="header">
-          <h1>⚡ Jouw Energieverbruik Profiel</h1>
-          <p className="subtitle">
-            Periode: {summary?.date_range_start?.split(' ')[0]} tot {summary?.date_range_end?.split(' ')[0]}
-          </p>
+          <h1>Energieprofiel</h1>
+          <p className="subtitle">Data van {summary?.date_range_start?.split('T')[0]} tot {summary?.date_range_end?.split('T')[0]}</p>
         </div>
 
-        {/* Key Metrics Grid - Schoon en hersteld */}
         <div className="metrics-grid">
           <div className="metric-card">
-            <div className="metric-icon">📈</div>
+            <div className="metric-icon">
+              <img 
+                src="/images/icons/Monitor-Heart-Rate-1--Streamline-Ultimate.png" 
+                alt="Hartslag monitor" 
+                style={{ width: '24px', height: '24px' }} 
+              />
+            </div>
             <div className="metric-content">
-              <p className="metric-label">Gem. Dagelijks</p>
-              <p className="metric-value">{avgDaily.toFixed(2)} <span className="unit">kWh</span></p>
+              <p className="metric-label">Gemiddelde Dagelijks</p>
+              <p className="metric-value">{(summary.average_daily_consumption || 0).toFixed(2)} <span className="unit">kWh</span></p>
             </div>
           </div>
 
-          <div 
-            className={`metric-card clickable ${showChart ? 'active' : ''}`} 
-            onClick={() => setShowChart(!showChart)}
-            title="Klik om maandgrafiek te tonen"
-          >
-            <div className="metric-icon">📅</div>
+          <div className={`metric-card clickable ${showChart ? 'active' : ''}`} onClick={() => setShowChart(!showChart)}>
+            <div className="metric-icon">
+              <img 
+                src="/images/icons/Time-Monthly-2--Streamline-Ultimate.png" 
+                alt="Hartslag monitor" 
+                style={{ width: '24px', height: '24px' }} 
+              />
+            </div>
             <div className="metric-content">
-              <p className="metric-label">
-                {showChart ? `Totaal ${maanden[selectedMonth - 1]}` : 'Gem. Maandelijks'} {showChart ? '▲' : '▼'}
-              </p>
-              <p className="metric-value">
-                {showChart && chartData.length > 0 
-                  ? chartData.reduce((acc, curr) => acc + (curr.verbruik || 0), 0).toFixed(2) 
-                  : monthlyConsumption.toFixed(2) 
-                } 
-                <span className="unit"> kWh</span>
-              </p>
+              <p className="metric-label">Maandoverzicht</p>
+              <p className="metric-value">{(analyticsData.summary?.monthlyConsumption || 0).toFixed(2)} <span className="unit">kWh</span></p>
             </div>
           </div>
 
-          <div 
-            className={`metric-card clickable ${showHourlyChart ? 'active' : ''}`} 
-            onClick={() => setShowHourlyChart(!showHourlyChart)}
-            title="Klik om uurgrafiek te tonen"
-          >
-            <div className="metric-icon">⏰</div>
+          <div className={`metric-card clickable ${showHourlyChart ? 'active' : ''}`} onClick={() => setShowHourlyChart(!showHourlyChart)}>
+            <div className="metric-icon">
+              <img 
+                src="/images/icons/Time-Clock-Circle--Streamline-Ultimate.png" 
+                alt="Hartslag monitor" 
+                style={{ width: '24px', height: '24px' }} 
+              />
+            </div>
             <div className="metric-content">
-              <p className="metric-label">Dagelijks Gebruik {showHourlyChart ? '▲' : '▼'}</p>
-              <p className="metric-value">Per Uur</p>
+              <p className="metric-label">Uurdetails</p>
+              <p className="metric-value">Bekijken</p>
             </div>
           </div>
 
-          <div className="metric-card">
-            <div className="metric-icon">⚡</div>
-            <div className="metric-content">
-              <p className="metric-label">Totaal Verbruik</p>
-              <p className="metric-value">{totalConsumption.toFixed(2)} <span className="unit">kWh</span></p>
+          <div className="metric-card-return-card">
+            <div className="metric-icon">
+              <img 
+                src="/images/icons/Weather-Sun--Streamline-Ultimate.png" 
+                alt="Hartslag monitor" 
+                style={{ width: '24px', height: '24px' }} 
+              />
             </div>
-          </div>
-
-          <div className="metric-card">
-            <div className="metric-icon">🔴</div>
             <div className="metric-content">
-              <p className="metric-label">Piekuur</p>
-              <p className="metric-value">{peakHour}:00</p>
+              <p className="metric-label">Teruglevering</p>
+              <p className="metric-value">{(summary.total_returned_kwh || 0).toFixed(2)} <span className="return">kWh</span></p>
             </div>
           </div>
         </div>
 
-        {/* Interactieve Grafiek Sectie - Dagelijks */}
         {showChart && (
-          <div className="chart-container-wrapper">
-            <div className="chart-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div className="chart-title-group">
-                <h3 style={{ margin: 0 }}>Verbruik per dag in detail</h3>
-                {!loadingChart && chartData.length > 0 && (
-                  <p style={{ margin: '5px 0 0 0', fontSize: '0.9rem', color: '#96c63e', fontWeight: 'bold' }}>
-                    Totaal {maanden[selectedMonth - 1]}: {chartData.reduce((acc, curr) => acc + (curr.verbruik || 0), 0).toFixed(2)} kWh
-                  </p>
-                )}
-              </div>
+          <div className="chart-container-wrapper" style={{ height: '450px', minHeight: '450px', display: 'block' }}>
+            <div className="chart-header">
+              <h3>Verbruik en Teruglevering per dag</h3>
               <select 
                 value={selectedMonth} 
-                onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                onChange={(e) => setSelectedMonth(parseInt(e.target.value))} 
                 className="month-select"
               >
-                {maanden.map((month, idx) => (
-                  <option key={idx} value={idx + 1}>{month}</option>
-                ))}
+                {maanden.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
               </select>
             </div>
-
+            
             {loadingChart ? (
-              <div className="chart-loading">Data ophalen...</div>
+              <div className="loading-state">Data ophalen...</div>
             ) : (
-              <div className="chart-holder">
-                <ResponsiveContainer width="100%" height={300}>
-                  <AreaChart data={chartData}>
-                    <defs>
-                      <linearGradient id="colorUsage" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#96c63e" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="#96c63e" stopOpacity={0}/>
-                      </linearGradient>
-                      <linearGradient id="colorReturn" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#2196F3" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="#2196F3" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="day" />
-                    <YAxis unit="kWh" />
+              <div style={{ width: '100%', height: '350px', position: 'relative' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart 
+                    data={dailyData} 
+                    margin={{ top: 20, right: 30, left: 10, bottom: 20 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
+                    <XAxis 
+                      dataKey="day" 
+                      type="category" 
+                      tick={{fill: '#666', fontSize: 12}}
+                    />
+                    <YAxis 
+                      width={50}
+                      domain={['auto', 'auto']} 
+                      allowDataOverflow={true}
+                      tick={{fill: '#666', fontSize: 12}}
+                      tickFormatter={(val) => val.toFixed(1)}
+                    />
                     <Tooltip />
-                    <Legend />
-                    <Area type="monotone" dataKey="verbruik" stroke="#96c63e" fill="url(#colorUsage)" name="Verbruik (kWh)" />
-                    <Area type="monotone" dataKey="teruglevering" stroke="#2196F3" fill="url(#colorReturn)" name="Teruglevering (kWh)" />
+                    <Legend 
+                      verticalAlign="top" 
+                      height={40} 
+                      formatter={(value) => (
+                        <span style={{ 
+                          fontFamily: 'Mulish, sans-serif', 
+                          fontWeight: 200,      // 200 is 'Extra Light' voor Mulish
+                          fontSize: '14px',
+                          color: '#666'         // Optioneel: pas hier de tekstkleur aan
+                        }}>
+                          {value}
+                        </span>
+                      )} 
+                    />
+
+                    {/* Verbruik: Groen - baseValue 0 is cruciaal voor de spiegel-look */}
+                    <Area 
+                      name="Verbruik"
+                      type="monotone" 
+                      dataKey="verbruik" 
+                      stroke="var(--benext-green)" 
+                      fill="var(--benext-lightgreen)" 
+                      fillOpacity={0.4} 
+                      baseValue={0}
+                      strokeWidth={2}
+                      isAnimationActive={false}
+                    />
+                    
+                    {/* Teruglevering: Blauw - baseValue 0 laat hem omlaag groeien */}
+                    <Area 
+                      name="Teruglevering" 
+                      type="monotone" 
+                      dataKey="teruglevering" 
+                      stroke="var(--benext-darkorange)" 
+                      fill="var(--benext-orange)" 
+                      fillOpacity={0.4} 
+                      baseValue={0}
+                      strokeWidth={2}
+                      isAnimationActive={false}
+                    />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -287,39 +272,67 @@ function PersonalDataPage() {
           </div>
         )}
 
-        {/* Interactieve Grafiek Sectie - Uurlijks */}
         {showHourlyChart && (
-          <div className="chart-container-wrapper">
+          <div className="chart-container-wrapper" style={{ height: '450px', width: '100%', marginBottom: '20px' }}>
             <div className="chart-header">
-              <h3>Verbruik per uur in detail</h3>
+              <h3>Gemiddeld verbruik per uur</h3>
               <select 
                 value={selectedMonthHourly} 
-                onChange={(e) => setSelectedMonthHourly(parseInt(e.target.value))}
+                onChange={(e) => setSelectedMonthHourly(parseInt(e.target.value))} 
                 className="month-select"
               >
-                {maanden.map((month, idx) => (
-                  <option key={idx} value={idx + 1}>{month}</option>
-                ))}
+                {maanden.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
               </select>
             </div>
+
             {loadingHourlyChart ? (
-              <div className="chart-loading">Data ophalen...</div>
+              <div className="loading-state">Uurdata ophalen...</div>
             ) : (
-              <div className="chart-holder">
-                <ResponsiveContainer width="100%" height={300}>
-                  <AreaChart data={hourlyChartData}>
-                    <defs>
-                      <linearGradient id="colorHourly" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#ff9800" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="#ff9800" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="hour" />
-                    <YAxis unit="kWh" />
-                    <Tooltip />
-                    <Legend />
-                    <Area type="monotone" dataKey="verbruik" stroke="#ff9800" fill="url(#colorHourly)" name="Verbruik (kWh)" />
+              <div style={{ width: '100%', height: '350px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={hourlyChartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
+                    <XAxis 
+                      dataKey="hour" 
+                      tickFormatter={(t) => `${t}:00`} 
+                      tick={{fill: '#666', fontSize: 12}}
+                    />
+                    <YAxis 
+                      tick={{fill: '#666', fontSize: 12}}
+                      domain={[0, 'auto']} 
+                    />
+                    <Tooltip labelFormatter={(t) => `Tijdstip: ${t}:00`} />
+                    <Legend 
+                        verticalAlign="top" 
+                        height={40} 
+                        formatter={(value) => (
+                          <span style={{ 
+                            fontFamily: 'Mulish, sans-serif', 
+                            fontWeight: 200,      
+                            fontSize: '14px',
+                            color: '#666'        
+                          }}>
+                            {value}
+                          </span>
+                        )} 
+                      />
+                    
+                    <Area 
+                      name="Gemiddelde Verbruik" 
+                      type="monotone" 
+                      dataKey="verbruik" 
+                      stroke="var(--benext-green)" 
+                      fill="var(--benext-lightgreen)" 
+                      fillOpacity={0.4} 
+                    />
+                    <Area 
+                      name="Gemiddelde Teruglevering" 
+                      type="monotone" 
+                      dataKey="teruglevering" 
+                      stroke="var(--benext-darkorange)" 
+                      fill="var(--benext-orange)" 
+                      fillOpacity={0.4} 
+                    />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -328,31 +341,33 @@ function PersonalDataPage() {
         )}
 
         <div className="info-box">
-          <div className="info-icon">💡</div>
+          <div className="metric-icon">
+              <img 
+                src="/images/icons/Weather-Sun--Streamline-Ultimate.png" 
+                alt="Hartslag monitor" 
+                style={{ width: '24px', height: '24px' }} 
+              />
+            </div>
           <div className="info-content">
-            <h3>Inzicht in Jouw Verbruik</h3>
-            <p>
-              Je hoogste verbruik vindt meestal plaats rond <strong>{peakHour}:00 uur</strong>. 
-              Het meest gunstige moment voor grootverbruik is rond <strong>{lowestHour}:00 uur</strong>.
-            </p>
+            <h3>Inzicht</h3>
+            <p>Hoogste verbruik: <strong>{peakHour}:00 uur</strong>. Gunstigste moment: <strong>{bestHour}:00 uur</strong>.</p>
           </div>
         </div>
 
-        <table className="stats-table">
-          <thead>
-            <tr><th>Statistiek</th><th>Waarde</th></tr>
-          </thead>
-          <tbody>
-            <tr><td>Gemiddeld dagelijks verbruik</td><td className="value">{avgDaily.toFixed(2)} kWh</td></tr>
-            <tr className="highlight"><td><strong>Totaal periode verbruik</strong></td><td className="value"><strong>{totalConsumption.toFixed(2)} kWh</strong></td></tr>
-          </tbody>
-        </table>
-
         <div className="action-buttons">
-          <button className="compare-btn" onClick={() => window.location.href = '/compare'}>⚖️ Vergelijk Contracten</button>
+          <button className="compare-btn" onClick={() => window.location.href = '/compare'}>
+            <div className="metric-icon">
+              <img 
+                src="/images/icons/Legal-Scale-1--Streamline-Ultimate.png" 
+                alt="Hartslag monitor" 
+                style={{ width: '24px', height: '24px' }} 
+              />
+            </div>
+             <h4>Vergelijk Contracten</h4></button>
         </div>
       </div>
     </div>
   )
 }
+
 export default PersonalDataPage

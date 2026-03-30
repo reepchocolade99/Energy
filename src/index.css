@@ -1,3 +1,6 @@
+@import url('https://fonts.googleapis.com');
+
+
 * {
   margin: 0;
   padding: 0;
@@ -5,9 +8,7 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: 'Mulish', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: #f5f5f5;
@@ -16,4 +17,11 @@ body {
 #root {
   width: 100%;
   min-height: 100vh;
+  --benext-darkgreen: #195c2f;
+  --benext-green: #3C9953;
+  --benext-lightgreen: #B0D7A6;
+  --benext-darkorange: #f9943c;
+  --benext-orange: #ffb86a;
+  --benext-lightorange: #fdd8b8;
+
 }

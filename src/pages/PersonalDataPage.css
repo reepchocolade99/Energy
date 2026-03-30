@@ -1,4 +1,4 @@
-
+@import url('https://fonts.googleapis.com');
 .personal-data-page {
   width: 100%;
   min-height: 100vh;
@@ -14,7 +14,7 @@
 .header {
   margin-bottom: 40px;
   position: relative;
-  background: linear-gradient(135deg, #96c63e 0%, #7fa02f 100%);
+  background: linear-gradient(135deg, var(--benext-green) 0%,var(--benext-darkgreen) 100%);
   padding: 30px;
   border-radius: 10px;
   box-shadow: 0 5px 20px rgba(150, 198, 62, 0.3);
@@ -49,7 +49,6 @@
   font-size: 14px;
   margin: 0;
 }
-
 .metrics-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -66,7 +65,19 @@
   gap: 15px;
   box-shadow: 0 3px 15px rgba(0, 0, 0, 0.1);
   transition: all 0.3s;
-  border-left: 4px solid #96c63e;
+  border-left: 4px solid var(--benext-green);
+}
+
+.metric-card-return-card {
+  background: white;
+  border-radius: 10px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  box-shadow: 0 3px 15px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s;
+  border-left: 4px solid var(--benext-darkorange);
 }
 
 .metric-card:hover {
@@ -77,6 +88,7 @@
 .metric-icon {
   font-size: 28px;
   min-width: 40px;
+
   text-align: center;
 }
 
@@ -88,8 +100,7 @@
   color: #666;
   font-size: 12px;
   margin: 0 0 5px 0;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+
   font-weight: 600;
 }
 
@@ -106,12 +117,17 @@
 .unit {
   font-size: 12px;
   font-weight: 500;
-  color: #96c63e;
+  color: var(--benext-green);
 }
 
+.return {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--benext-darkorange);
+}
 .info-box {
   background: #f0f7ff;
-  border-left: 4px solid #96c63e;
+  border-left: 4px solid var(--benext-green);
   border-radius: 8px;
   padding: 20px;
   display: flex;
@@ -140,7 +156,7 @@
 }
 
 .info-content strong {
-  color: #96c63e;
+  color: var(--benext-green);
   font-weight: 600;
 }
 
@@ -197,10 +213,9 @@
 }
 
 .stats-table td.value {
-  color: #96c63e;
+  color: var(--benext-green);
   font-weight: 600;
   text-align: right;
-  font-family: 'Courier New', monospace;
 }
 
 .action-buttons {
@@ -213,37 +228,29 @@
 
 .compare-btn,
 .new-file-btn {
-  padding: 14px 28px;
-  border: none;
-  border-radius: 5px;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  margin-bottom: 40px;
+  position: relative;
+  background: linear-gradient(135deg, var(--benext-green) 0%,var(--benext-darkgreen) 100%);
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 5px 20px rgba(150, 198, 62, 0.3);
 }
 
-.compare-btn {
-  background: #96c63e;
-  color: white;
-}
 
 .compare-btn:hover {
-  background: #7fa02f;
+  background: var(--benext-lightgreen);
   transform: translateY(-2px);
   box-shadow: 0 5px 15px rgba(150, 198, 62, 0.4);
 }
 
 .new-file-btn {
   background: white;
-  color: #96c63e;
-  border: 2px solid #96c63e;
+  color: var(--benext-green);
+  border: 2px solid var(--benext-green);
 }
 
 .new-file-btn:hover {
-  background: #f9fff3;
+  background: var(--benext-lightgreen);
   transform: translateY(-2px);
 }
 
@@ -266,6 +273,12 @@
   font-size: 24px;
 }
 
+.metric-icon h4{
+  color: #ffffff;
+  margin: 0 0 10px 0;
+  font-size: 24px;
+}
+
 .empty-state p {
   color: #666;
   margin: 0 0 20px 0;
@@ -273,7 +286,7 @@
 }
 
 .upload-btn {
-  background: #96c63e;
+  background: var(--benext-green);
   color: white;
   border: none;
   padding: 12px 30px;
@@ -284,7 +297,7 @@
 }
 
 .upload-btn:hover {
-  background: #7fa02f;
+  background: var(--benext-lightgreen);
   transform: translateY(-2px);
   box-shadow: 0 5px 15px rgba(150, 198, 62, 0.4);
 }
@@ -339,24 +352,32 @@
 
 .metric-card.clickable:hover {
     transform: translateY(-5px);
-    border-color: #96c63e;
+    border-color: var(--benext-green);
     box-shadow: 0 6px 15px rgba(0,0,0,0.1);
 }
 
 .metric-card.active {
     background-color: #f0f7e6;
-    border-color: #96c63e;
+    border-color: var(--benext-green);
 }
 
 .chart-container-wrapper {
-    background: white;
-    padding: 25px;
-    border-radius: 15px;
-    margin: 20px 0;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-    animation: fadeIn 0.4s ease-out;
+  display: block;
+  min-height: 450px;
+  width: 100%;
+  overflow: visible;
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
 }
 
+.recharts-wrapper {
+  overflow: visible;
+}
+
+.recharts-responsive-container {
+  min-height: 300px;
+}
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
@@ -393,10 +414,10 @@
 }
 
 .month-total-badge {
-  background-color: #f0f7e6;
+  background-color: #ffffff;
   color: #4a6d1d;
   padding: 4px 12px;
   border-radius: 20px;
   font-size: 0.9rem;
-  border: 1px solid #96c63e;
+  border: 1px solid var(--benext-green)
 }

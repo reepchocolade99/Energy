@@ -1,24 +1,15 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { useState } from 'react'
 import ComparePage from './pages/ComparePage'
 import PersonalDataPage from './pages/PersonalDataPage'
 import './App.css'
 
 function App() {
-  const [formData, setFormData] = useState(null)
-
   return (
     <BrowserRouter>
       <div className="app">
         <Routes>
           <Route path="/" element={<PersonalDataPage />} />
-          <Route path="/compare" element={
-            <ComparePage
-              formData={formData}
-              onGoBack={() => window.location.href = '/'}
-              onGoHome={() => window.location.href = '/'}
-            />
-          } />
+          <Route path="/compare" element={<ComparePage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
