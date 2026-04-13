@@ -28,13 +28,18 @@ def load_local_data():
                 'error': f'Bestand {DATA_FILE} niet gevonden.'
             }), 404
 
+        # Capture optional manual consumption parameters from query string
+        manual_hoog = request.args.get('hoog', type=float, default=None)
+        manual_laag = request.args.get('laag', type=float, default=None)
+
         calc = EnergyCalculator(DATA_FILE)
-        response_data = calc.get_full_analysis_json()
+        response_data = calc.get_full_analysis_json(manual_hoog=manual_hoog, manual_laag=manual_laag)
         return jsonify(response_data), 200
 
     except Exception as e:
         print(f"[ERROR] load_local_data: {traceback.format_exc()}")
         return jsonify({'success': False, 'error': str(e)}), 500
+    
 @app.route('/api/month-detail/<int:month>', methods=['GET'])
 def get_month_detail(month):
     try:

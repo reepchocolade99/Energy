@@ -1,227 +1,218 @@
 import React, { useState, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import './ComparePage.css';
 import { useNavigate } from 'react-router-dom';
+import './ComparePage.css';
 
 function ComparePage() {
   const navigate = useNavigate();
   const [contracts, setContracts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedType, setSelectedType] = useState('Dynamisch');
-  const [selectedContract, setSelectedContract] = useState(null);
-  const [monthlyData, setMonthlyData] = useState([]);
-  const [selectedMonth, setSelectedMonth] = useState(null);
-  const [viewMode, setViewMode] = useState('kosten');
-  const [monthlyConsumption, setMonthlyConsumption] = useState(0);
+  const [selectedTypes, setSelectedTypes] = useState(['Vast', 'Dynamisch', 'Variabel']); 
+  const [compareList, setCompareList] = useState([]);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [consumption, setConsumption] = useState({ hoog: 45, laag: 25 });
 
   const fetchContracts = async () => {
     setLoading(true);
     try {
       const response = await fetch('http://127.0.0.1:5001/api/load-local-data');
-      if (!response.ok) throw new Error(`Server fout: ${response.status}`);
-      
       const data = await response.json();
-      
-      if (data.success && data.results) {
-        const formatted = data.results.map(c => ({
-          ...c,
-          provider: c.provider || 'Onbekend',
-          type: c.type || 'Onbekend',
-          monthlyCost: Number(c.monthlyCost) || 0, 
-          yearlyCost: Number(c.yearlyCost) || 0,
-          totalUsage: Number(c.totalUsage) || 0,
-          lowUsage: Number(c.lowUsage) || 0,
-          normalUsage: Number(c.normalUsage) || 0,
-          fixedCosts: Number(c.fixedCosts) || 0,
-          monthly_breakdown: c.monthly_breakdown || {}
-        }));
-        
-        setContracts(formatted);
-        setMonthlyConsumption(data.summary?.monthlyConsumption || 0);
+      if (data.success) {
+        setContracts(data.results || []);
       }
-    } catch (error) {
-      console.error("ComparePage Error:", error);
-    } finally {
-      setLoading(false);
+    } catch (e) { 
+      console.error("Fout bij laden data:", e); 
+    } finally { 
+      setLoading(false); 
     }
   };
 
-  useEffect(() => { 
-    fetchContracts(); 
-  }, []);
+  useEffect(() => { fetchContracts(); }, []);
 
-  const handleContractClick = (contract) => {
-    const monthNames = ['Jan', 'Feb', 'Mrt', 'Apr', 'Mei', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec'];
-    if (contract.monthly_breakdown) {
-      const chartFormat = Object.entries(contract.monthly_breakdown).map(([monthNum, data]) => ({
-        month: monthNames[parseInt(monthNum) - 1],
-        totaal: typeof data === 'object' ? (data.totaal || 0) : (data || 0),
-        normaal: data.kosten_normaal || 0,
-        dal: data.kosten_dal || 0,
-        verbruik_normaal: data.verbruik_normaal || 0,
-        verbruik_dal: data.verbruik_dal || 0
-      }));
-      setMonthlyData(chartFormat);
-    }
-    setSelectedContract(contract);
+  const handleTypeToggle = (type) => {
+    setSelectedTypes(prev => 
+      prev.includes(type) 
+        ? (prev.length > 1 ? prev.filter(t => t !== type) : prev) 
+        : [...prev, type]
+    );
   };
 
-  if (loading) {
-    return <div className="loading-container"><div className="loader"></div><p>De beste deals berekenen...</p></div>;
-  }
-
-  const top3 = contracts && contracts.length > 0 
-    ? [...contracts].sort((a, b) => (a.monthlyCost || 0) - (b.monthlyCost || 0)).slice(0, 3) 
-    : [];
-
-  const getRange = (type) => {
-    const filtered = contracts?.filter(c => c.type === type) || [];
-    if (filtered.length === 0) return { min: 0, max: 0 };
-    const prices = filtered.map(c => c.monthlyCost || 0);
-    return { min: Math.min(...prices), max: Math.max(...prices) };
+  const toggleCompare = (contract) => {
+    setCompareList((prev) => {
+      const isAlreadySelected = prev.find((item) => item.id === contract.id);
+      if (isAlreadySelected) return prev.filter((item) => item.id !== contract.id);
+      if (prev.length < 3) return [...prev, contract]; // Max 3 voor overzichtelijkheid
+      return prev;
+    });
   };
 
-  // Stats berekenen op basis van geselecteerd contract
-  const stats = (selectedContract && monthlyData.length > 0) ? {
-      maxMonth: monthlyData.reduce((prev, curr) => (prev.totaal > curr.totaal) ? prev : curr),
-      minMonth: monthlyData.reduce((prev, curr) => (prev.totaal < curr.totaal) ? prev : curr),
-      jaarTotaal: monthlyData.reduce((sum, curr) => sum + curr.totaal, 0),
-      vasteKosten: selectedContract.fixedCosts || 7.00,
-      totaalVerbruik: selectedContract.totalUsage,
-      verbruikNormaal: selectedContract.normalUsage,
-      verbruikDal: selectedContract.lowUsage
-  } : null;
+  if (loading) return <div className="loader-container">Laden...</div>;
 
   return (
-    <div className="compare-page">
-      <div className="compare-container">
-        <header className="header">
-          <div className="header-top">
-            <button className="back-btn" onClick={() => navigate('/personal-data')}>
-              ← Terug naar verbruik
-            </button>
-            <h1>Beste deals voor jou</h1>
-          </div>
-          <p className="comparison-info">
-            Verbruik: <strong>{Math.round(monthlyConsumption)} kWh</strong>/mnd
-          </p>
-          <h1>Beste deals voor jou</h1>
-          <p className="comparison-info">
-            Verbruik: <strong>{Math.round(monthlyConsumption)} kWh</strong>/mnd
-          </p>
-        </header>
+    <div className="compare-layout">
+      {/* LINKER SIDEBAR - FILTERS */}
+      <aside className="left-sidebar">
+        <button className="back-link" onClick={() => navigate('/personal-data')}>← Terug</button>
+        <h2 className="sidebar-title">Jouw Gegevens</h2>
+        
+        <div className="input-group">
+          <label>Verbruik Normaal (kWh)</label>
+          <input type="number" value={consumption.hoog} onChange={(e) => setConsumption({...consumption, hoog: +e.target.value})} />
+        </div>
 
-        <section className="best-options-container">
-          <h2 className="dashboard-title">🏆 Top 3 Goedkoopste</h2>
-          <div className="mini-cards-grid">
-            {top3.map((contract, idx) => (
-              <div key={idx} className="mini-card-item">
-                <span className="mini-ranking">#{idx + 1}</span>
-                <div className="mini-price-highlight">€{(contract.monthlyCost || 0).toFixed(2).replace('.', ',')}</div>
-                <div className="mini-contract-name">{contract.provider}</div>
-              </div>
+        <div className="input-group">
+          <label>Verbruik Dal (kWh)</label>
+          <input type="number" value={consumption.laag} onChange={(e) => setConsumption({...consumption, laag: +e.target.value})} />
+        </div>
+
+        <button className="apply-btn" onClick={fetchContracts}>Update Berekening</button>
+
+        <div className="type-selector-section">
+          <h3>Contractvorm</h3>
+          <div className="type-checkboxes-vertical">
+            {['Vast', 'Dynamisch', 'Variabel'].map(type => (
+              <label key={type} className="type-checkbox">
+                <input
+                  type="checkbox"
+                  checked={selectedTypes.includes(type)}
+                  onChange={() => handleTypeToggle(type)}
+                />
+                <span className="checkbox-label">
+                  {type}
+                </span>
+              </label>
             ))}
           </div>
-        </section>
+        </div>
+        </aside>
 
-        <section className="price-ranges-grid">
-          {['Dynamisch', 'Variabel', 'Vast'].map(type => {
-            const range = getRange(type);
-            return (
-              <div key={type} className={`range-card ${type.toLowerCase()}`}>
-                <h3 className="range-title">{type}</h3>
-                <div className="range-info">Min: €{range.min.toFixed(2)}</div>
-                <div className="range-info">Max: €{range.max.toFixed(2)}</div>
-              </div>
-            );
-          })}
-        </section>
-
-        <nav className="filter-nav">
-          {['Dynamisch', 'Variabel', 'Vast'].map(type => (
-            <button key={type} onClick={() => setSelectedType(type)} className={selectedType === type ? 'active' : ''}>
-              {type}
-            </button>
-          ))}
-        </nav>
-
+      {/* MIDDEN - CONTRACTEN */}
+      <main className="results-area">
+        <h1 className="results-title">Beschikbare contracten</h1>
         <div className="contracts-grid">
-          {contracts.filter(c => c.type === selectedType).map((contract, index) => (
-            <ContractCard key={index} contract={contract} onCardClick={() => handleContractClick(contract)} />
-          ))}
+          {contracts
+            .filter(c => selectedTypes.includes(c.type))
+            .map((c) => (
+              <ContractCard 
+                key={c.id} 
+                contract={c} 
+                onCompareToggle={() => toggleCompare(c)}
+                isCompared={compareList.some(item => item.id === c.id)} 
+              />
+            ))
+          }
+        </div>
+      </main>
+
+      {/* RECHTER SIDEBAR - VERGELIJKING (SCHUIFT IN) */}
+      <div className={`comparison-drawer ${isSidebarOpen ? 'open' : ''}`}>
+        <div className="drawer-header">
+          <h2>Vergelijking</h2>
+          <button className="close-drawer" onClick={() => setIsSidebarOpen(false)}>×</button>
+        </div>
+        <div className="drawer-content">
+          <table className="comparison-table">
+            <thead>
+              <tr>
+                <th>Kenmerken</th>
+                {compareList.map(c => (
+                  <th key={c.id}>{c.provider}</th>
+                ))}
+              </tr>
+            </thead>
+            {/* Zoek de <tbody> in je comparison-drawer en vervang de rijen: */}
+            <tbody>
+              <tr>
+                <td><strong>Type</strong></td>
+                {compareList.map(c => <td key={c.id}>{c.type || 'Variabel'}</td>)}
+              </tr>
+              <tr>
+                <td><strong style={{ color: '#f9943c' }}>Jaarverbruik (geschat)</strong></td>
+                {compareList.map(c => <td key={c.id}>{c.estUsage} kWh</td>)}
+              </tr>
+              <tr>
+                <td><strong style={{ color: '#3C9953' }}>Teruglevering (geschat)</strong></td>
+                {compareList.map(c => <td key={c.id}>-{c.estReturn} kWh</td>)}
+              </tr>
+              <tr>
+                <td><strong>Netto stroom</strong></td>
+                {compareList.map(c => (
+                  <td key={c.id}>
+                    {Math.max(0, c.estUsage - c.estReturn).toFixed(0)} kWh
+                  </td>
+                ))}
+              </tr>
+              <tr className="price-row">
+                <td><strong>Maandkosten</strong></td>
+                {compareList.map(c => (
+                  <td key={c.id} className="table-price" style={{ color: '#195c2f' }}> {/* BeNext Dark Green [cite: 16] */}
+                    €{c.monthlyCost.toFixed(2)}
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
-      {selectedContract && (
-        <aside className="sidebar-container">
-          <div className="sidebar-header">
-            <h3>{selectedContract.provider}</h3>
-            <button onClick={() => setSelectedContract(null)} className="close-sidebar-btn">✕</button>
+      {/* ONDERSTE BALK */}
+      {compareList.length > 0 && (
+        <div className="bottom-compare-bar">
+          <div className="bar-left-section">
+            {/* DE TELLER IN DE BALK */}
+            <div className={`bar-counter ${compareList.length >= 3 ? 'limit' : ''}`}>
+              {compareList.length}/3
+            </div>
+            
+            <div className="selected-providers">
+              {compareList.map(c => (
+                <span key={c.id} className="provider-tag">{c.provider}</span>
+              ))}
+            </div>
           </div>
-          <div className="sidebar-content">
-             <div className="chart-container">
-               <ResponsiveContainer width="100%" height={250}>
-                  <LineChart data={monthlyData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="month" />
-                    <YAxis hide domain={['auto', 'auto']} />
-                    <Tooltip />
-                    <Line 
-                      type="monotone" 
-                      dataKey={viewMode === 'kosten' ? 'totaal' : 'verbruik_normaal'} 
-                      stroke="#96c63e" 
-                      strokeWidth={3} 
-                    />
-                  </LineChart>
-               </ResponsiveContainer>
-             </div>
-             
-             <div className="toggle-group">
-                <button onClick={() => setViewMode('kosten')} className={viewMode === 'kosten' ? 'active' : ''}>Kosten</button>
-                <button onClick={() => setViewMode('verbruik')} className={viewMode === 'verbruik' ? 'active' : ''}>Verbruik</button>
-             </div>
 
-             {stats && (
-                <div className="sidebar-stats-grid">
-                  <div className="stat-item">
-                    <span className="stat-label">Vaste leveringskosten</span>
-                    <span className="stat-value">€{stats.vasteKosten.toFixed(2).replace('.', ',')}</span>
-                  </div>
-                  <div className="stat-item">
-                    <span className="stat-label">Totaal per jaar</span>
-                    <span className="stat-value">€{stats.jaarTotaal.toFixed(2).replace('.', ',')}</span>
-                  </div>
-                  <div className="stat-item">
-                    <span className="stat-label">Piek maand</span>
-                    <span className="stat-value">{stats.maxMonth.month}</span>
-                  </div>
-                </div>
-              )}          
-          </div>
-        </aside>
+          <button className="compare-now-btn bottom-bar-btn" onClick={() => setIsSidebarOpen(true)}>
+            Bekijk vergelijking
+          </button>
+        </div>
       )}
     </div>
   );
 }
 
-const ContractCard = ({ contract, onCardClick }) => (
-  <div className="contract-card" onClick={onCardClick}>
-    <div className="card-header">
-      <div className="provider-icon">{contract.provider[0]}</div>
-      <h3>{contract.provider}</h3>
-    </div>
-    <div className="card-content">
-      <div className="main-price-row">
-        <span className="price-amount">€{contract.monthlyCost.toFixed(2).replace('.', ',')}</span>
-        <span className="price-period">/mnd</span>
+const ContractCard = ({ contract, onCompareToggle, isCompared }) => {
+  const [euro, cents] = contract.monthlyCost.toFixed(2).split('.');
+  
+  return (
+    <div className="contract-card" style={{ borderRadius: '0.65rem' }}> {/*  */}
+      <div className="card-body">
+        <span className="provider-name" style={{ fontWeight: 700, fontFamily: 'Mulish' }}>{contract.provider}</span>
+        
+        <div className="price-tag"> 
+          <span className="euro">€{euro}</span>
+          <span className="cents">,{cents}</span>
+          <span className="per-mnd">/mnd</span>
+        </div>
+
+        {/* Energie details sectie */}
+        <div className="energy-details">
+          <div className="detail-item" style={{ color: 'var(--benext-green)' }}> {/* BeNext Dark Orange [cite: 17] */}
+            <strong>Verbruik:</strong> {contract.estUsage} kWh
+          </div>
+          <div className="detail-item" style={{ color: 'var(--benext-orange)' }}> {/* BeNext Green [cite: 18] */}
+            <strong>Teruglevering:</strong> {contract.estReturn} kWh
+          </div>
+        </div>
+
+        <label className="compare-check">
+          <input type="checkbox" checked={isCompared} onChange={onCompareToggle} />
+          <span>Vergelijk</span>
+        </label>
       </div>
-      <div className="rates-box">
-        <div className="rate-row"><span>Type:</span> <span className="rate-value">{contract.type}</span></div>
-        <div className="rate-row"><span>Jaar:</span> <span className="rate-value">€{contract.yearlyCost.toFixed(0)}</span></div>
+      <div className={`contract-type-badge ${contract.type?.toLowerCase()}`}>
+        {contract.type || 'Onbekend'}
       </div>
     </div>
-    <button className="select-btn">Bekijk Details</button>
-  </div>
-);
+  );
+};
 
 export default ComparePage;

@@ -1,433 +1,418 @@
-/* ==========================================================================
-   1. ALGEMENE LAYOUT & DASHBOARD
-   ========================================================================== */
-.compare-page {
-  width: 100%;
+
+:root {
+  --benext-darkgreen: #195c2f;
+  --benext-green: #3C9953;
+  --benext-lightgreen: #B0D7A6;
+  --benext-darkorange: #f9943c;
+  --benext-orange: #ffb86a;
+  --benext-radius: 0.65rem;
+  --font-main: 'Mulish', sans-serif;
+}
+
+body {
+  font-family: var(--font-main);
+  background-color: #f8f9fa;
+  margin: 0;
+}
+
+.compare-layout {
+  display: flex;
   min-height: 100vh;
-  padding: 20px;
-  background: #f4f7f1; /* Zacht grijs/groen */
-  font-family: 'Mulish';
-  display: flex; /* Nodig voor de sidebar layout */
-  gap: 30px;
 }
 
-.main-content {
-  flex: 1;
-  max-width: 1200px;
-  margin: 0 auto;
+/* ==========================================================================
+   HEADER & TITELS
+   ========================================================================== */
+.results-title {
+  font-size: var(--h1-size); /* Zorg dat var(--h1-size) ergens gedefinieerd is, bv. clamp() */
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 2rem;
 }
 
-.loading-container {
+.sidebar-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  margin-top: 2rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ==========================================================================
+   LINKER SIDEBAR (FILTERS)
+   ========================================================================== */
+.left-sidebar {
+  width: 320px;
+  background: white;
+  padding: 2.5rem 2rem;
+  border-right: 1px solid rgba(0,0,0,0.05);
+  box-shadow: 4px 0 15px rgba(0,0,0,0.02);
+}
+
+.input-group {
+  margin-bottom: 1rem;
+}
+
+.input-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.input-group input {
+  width: 100%;
+  padding: 0.6rem;
+  border-radius: var(--benext-radius);
+  border: 1px solid #ccc;
+}
+
+.apply-btn {
+  width: 100%;
+  background-color: var(--benext-green);
+  color: white;
+  border: none;
+  padding: 0.8rem;
+  font-size: 1rem;
+  border-radius: var(--benext-radius);
+  cursor: pointer;
+  margin-bottom: 2rem;
+}
+
+/* --- Filter Checkboxes --- */
+.type-selector-section {
+  font-family: var(--font-main);
+  margin-bottom: 1.5rem;
+}
+
+.type-selector-section h3 {
+  color: var(--benext-darkgreen);
+  margin-bottom: 0.75rem;
+}
+
+.type-checkboxes-vertical {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  gap: 0.5rem;
+}
+
+.type-checkbox {
+  display: flex;
   align-items: center;
-  height: 80vh;
-  color: #96c63e;
-  font-weight: bold;
-}
-
-/* ==========================================================================
-   2. HEADER & NAVIGATIE
-   ========================================================================== */
-.header {
-  margin-bottom: 40px;
-  padding: 40px;
-  background: #96c63e;
-  border-radius: 15px;
-  box-shadow: 0 4px 15px rgba(150, 198, 62, 0.3);
-  position: relative;
-}
-
-.header h1 {
-  color: white;
-  margin: 0 0 10px 0;
-  font-size: 32px;
-}
-
-.comparison-info {
-  color: #ffffff;
-  font-size: 16px;
-  opacity: 0.9;
-}
-
-.split-info {
-  font-size: 0.85rem;
-  margin-top: 8px;
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.back-btn {
-  background: white;
-  color: #96c63e;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 8px;
-  font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s;
-  margin-bottom: 20px;
+  padding: 0.5rem;
+  border-radius: var(--benext-radius);
+  transition: background-color 0.3s;
 }
 
-.back-btn:hover {
-  transform: translateX(-5px);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+.type-checkbox:hover {
+  background-color: var(--benext-lightgreen);
+}
+
+.type-checkbox input[type="checkbox"] {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--benext-darkgreen);
+  border-radius: 4px;
+  margin-right: 0.75rem;
+  position: relative;
+  cursor: pointer;
+  transition: border-color 0.3s, background-color 0.3s;
+}
+
+.type-checkbox input[type="checkbox"]:checked {
+  background-color: var(--benext-green);
+  border-color: var(--benext-green);
+}
+
+.type-checkbox input[type="checkbox"]:checked::after {
+  content: "";
+  display: block;
+  width: 6px;
+  height: 12px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.checkbox-label {
+  color: black;
 }
 
 /* ==========================================================================
-   3. CONTRACT GRIDS & CARDS
+   MIDDENSECTIE (CONTRACT KAARTEN)
    ========================================================================== */
+.results-area {
+  flex: 1;
+  padding: 2rem;
+  margin-bottom: 100px;
+}
+
 .contracts-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 25px;
-  margin-bottom: 40px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
 }
 
 .contract-card {
   background: white;
-  border-radius: 12px;
-  border: 2px solid transparent;
-  padding: 25px;
+  padding: 2rem;
+  border-radius: var(--benext-radius);
+  border: 1px solid rgba(25, 92, 47, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   flex-direction: column;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-  transition: all 0.3s;
-  cursor: pointer;
+  justify-content: space-between;
 }
 
 .contract-card:hover {
   transform: translateY(-5px);
-  border-color: #96c63e;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1);
-}
-
-.contract-card h3 {
-  margin: 0 0 5px 0;
-  color: #373737;
-  font-size: 20px;
-}
-
-.contract-card p {
-  color: #888;
-  font-size: 14px;
-  margin-bottom: 15px;
-}
-
-.price-display {
-  color: #96c63e;
-  font-size: 32px;
-  font-weight: 800;
-  margin-bottom: 15px;
-}
-
-.price-display span {
-  font-size: 14px;
-  color: #666;
-  font-weight: normal;
-}
-
-.card-footer {
-  margin-top: auto;
-  padding-top: 15px;
-  font-size: 12px;
-  color: #96c63e;
-  font-weight: bold;
-  text-align: center;
-  border-top: 1px solid #f0f0f0;
-}
-
-/* ==========================================================================
-   4. DASHBOARD SECTIES (Top 3 & Ranges)
-   ========================================================================== */
-.best-options-container {
-  margin-bottom: 40px;
-  background-color: #f9f9f9;
-  padding: 20px;
-  border-radius: 12px;
-  border: 2px solid #96c63e;
-}
-
-.dashboard-title {
-  font-size: 18px;
-  font-weight: bold;
-  margin-bottom: 15px;
-  color: #333;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.mini-cards-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 15px;
-}
-
-.mini-card-item {
-  background-color: #fff;
-  padding: 15px;
-  border-radius: 8px;
-  border: 1px solid #ddd;
-}
-
-.mini-ranking {
-  font-size: 14px;
-  font-weight: bold;
-  color: #666;
-}
-
-.mini-price-highlight {
-  font-size: 22px;
-  font-weight: bold;
-  color: #96c63e;
-  margin-top: 5px;
-}
-
-.mini-contract-name {
-  font-size: 12px;
-  color: #999;
-  margin-top: 5px;
-}
-
-/* Price Ranges Grid */
-.price-ranges-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 15px;
-  margin-bottom: 40px;
-}
-
-.range-card {
-  padding: 15px;
-  border-radius: 8px;
-  border: 2px solid transparent;
-}
-
-.range-card.dynamisch { background-color: #f0f8ff; border-color: #96c63e; }
-.range-card.variabel { background-color: #fff8f0; border-color: #ff9800; }
-.range-card.vast { background-color: #f0f7ff; border-color: #2196F3; }
-
-.range-title {
-  font-size: 16px;
-  font-weight: bold;
-  margin-bottom: 10px;
-  color: #333;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.range-info {
-  font-size: 14px;
-  color: #555;
-  margin-bottom: 5px;
-}
-
-/* ==========================================================================
-   5. FILTER NAVIGATIE
-   ========================================================================== */
-.filter-nav {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-  margin-bottom: 30px;
-}
-
-.filter-nav button {
-  padding: 12px 24px;
-  border: none;
-  border-radius: 10px;
-  font-weight: 600;
-  cursor: pointer;
-  background: #fff;
-  color: #666;
-  transition: all 0.3s;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
-
-.filter-nav button.active {
-  background: #96c63e;
-  color: white;
-}
-
-/* ==========================================================================
-   6. SIDEBAR (DETAILS)
-   ========================================================================== */
-.sidebar-container {
-  width: 42%;
-  max-width: 640px;
-  background-color: #ffffff;
-  padding: 30px;
-  box-shadow: -8px 0 24px rgba(0,0,0,0.1);
-  position: sticky;
-  top: 20px;
-  height: calc(100vh - 40px);
-  overflow-y: auto;
-  border-radius: 15px;
-  z-index: 100;
-}
-
-.sidebar-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 25px;
-  border-bottom: 2px solid #f0f0f0;
-  padding-bottom: 15px;
+  box-shadow: 0 12px 30px rgba(25, 92, 47, 0.08);
+  border-color: var(--benext-green);
 }
 
 .provider-name {
-  margin: 0;
-  color: #333;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--benext-green);
 }
 
-.contract-label {
-  color: #888;
-  font-size: 14px;
-}
-
-.close-sidebar-btn {
-  background: #ff6b6b;
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 8px 16px;
-  cursor: pointer;
-  font-weight: bold;
-}
-
-.chart-title {
-  font-size: 16px;
-  margin: 20px 0;
-  color: #444;
-}
-
-/* Controls & Toggles */
-.controls {
+.price-tag {
+  margin: 0.75rem 0;
   display: flex;
-  flex-direction: column;
-  gap: 15px;
-  margin: 20px 0;
+  align-items: baseline;
 }
 
-.month-select {
-  padding: 10px;
-  border-radius: 8px;
-  border: 1px solid #ddd;
-  background: white;
+.euro { 
+  font-size: 2.5rem; 
+  /* font-weight: 800;  */
+  color: var(--benext-green); 
 }
 
-.toggle-group {
-  display: flex;
-  gap: 10px;
-  background: #f0f0f0;
-  padding: 5px;
-  border-radius: 10px;
-}
-
-.toggle-group button {
-  flex: 1;
-  border: none;
-  padding: 8px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: all 0.2s;
-}
-
-.toggle-group button.active {
-  background: white;
-  color: #96c63e;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-/* Details Box binnen Sidebar */
-.details-box {
-  margin-top: 20px;
-  background-color: #e8f5e9;
-  padding: 20px;
-  border-radius: 12px;
-  border: 1px solid #4caf50;
-}
-
-.details-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.contract-type-badge {
+  color: var(--benext-lightgreen);
+  font-style: italic;
+  margin-top: 8px;  
 }
 
 .detail-item {
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
+/* --- De BeNext Checkbox op de kaarten --- */
+.compare-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-family: var(--font-main);
+  color: var(--benext-darkgreen);
+  margin-top: 1rem;
+}
+
+.compare-check input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--benext-lightgreen);
+  border-radius: 4px;
+  margin: 0;
+  position: relative;
+  cursor: pointer;
+  background-color: white;
+  transition: all 0.2s ease-in-out;
+}
+
+.compare-check input[type="checkbox"]:checked {
+  background-color: var(--benext-green);
+  border-color: var(--benext-green);
+}
+
+.compare-check input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 2px;
+  width: 6px;
+  height: 11px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.compare-check:hover input[type="checkbox"] {
+  border-color: var(--benext-green);
+}
+
+/* ==========================================================================
+   RECHTER DRAWER (VERGELIJKINGSTABEL)
+   ========================================================================== */
+.comparison-drawer {
+  position: fixed;
+  right: -520px; /* Buiten beeld */
+  top: 0;
+  width: 500px;
+  height: 100vh;
+  background: white;
+  box-shadow: -5px 0 15px rgba(0,0,0,0.1);
+  transition: right 0.3s ease-in-out;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+}
+
+.comparison-drawer.open { 
+  right: 0; 
+}
+
+.drawer-header {
+  background: var(--benext-darkgreen);
+  color: white;
+  padding: 1.5rem;
   display: flex;
   justify-content: space-between;
-  font-size: 14px;
-  color: #2e7d32;
+  align-items: center;
 }
 
-.detail-item strong {
-  font-size: 16px;
+.drawer-content {
+  padding: 1.5rem;
+  overflow-y: auto;
 }
 
-/* Responsive */
-@media (max-width: 1100px) {
-  .compare-page {
-    flex-direction: column;
-  }
-  .sidebar-container {
-    width: 100%;
-    max-width: none;
-    position: relative;
-    top: 0;
-    height: auto;
-  }
-  .mini-cards-grid, .price-ranges-grid {
-    grid-template-columns: 1fr;
-  }
+/* --- De Tabel in de Drawer --- */
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
 }
 
-
-/* Container voor de stats onder de grafiek */
-.sidebar-stats-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr; /* Twee kolommen */
-    gap: 12px;
-    margin: 20px 0;
-    padding: 16px;
-    background-color: #f8f9fa; /* Lichtgrijze achtergrond voor contrast */
-    border-radius: 12px;
-    border: 1px solid #eee;
+.comparison-table th, 
+.comparison-table td {
+  padding: 1.2rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid #eaeaea;
+  font-size: 0.9rem;
 }
 
-/* De titeltjes boven de bedragen (bijv. "Duurste maand") */
-.stat-label {
-    display: block;
-    font-size: 11px;
-    text-transform: uppercase; /* Alles in hoofdletters voor een moderne look */
-    letter-spacing: 0.5px;
-    color: #7f8c8d; /* Zachte grijstint */
-    margin-bottom: 4px;
-    font-weight: 600;
+.comparison-table th {
+  background-color: #f9fafb;
+  color: var(--benext-darkgreen);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  vertical-align: bottom;
 }
 
-/* De bedragen zelf */
-.stat-value {
-    font-size: 16px;
-    font-weight: 700;
-    color: #2c3e50; /* Donkerblauw/grijs voor leesbaarheid */
+.comparison-table td:first-child {
+  font-weight: 400; /* Regular in plaats van Bold */
+  color: #333;
+  width: 30%;
 }
 
-/* Specifieke styling voor het Jaartotaal (omdat deze belangrijker is) */
-.total-year {
-    grid-column: span 2; /* Neemt de volledige breedte in */
-    margin-top: 8px;
-    padding-top: 12px;
-    border-top: 1px dashed #ccc; /* Scheidingslijn */
-    display: flex;
-    justify-content: space-between; /* Label links, bedrag rechts */
-    align-items: center;
+.price-row td {
+  border-bottom: none;
+  padding-top: 20px;
 }
 
-.total-year .stat-value {
-    font-size: 20px;
-    color: #96c63e; /* Jouw accentkleur */
+.table-price {
+  font-weight: 800;
+  font-size: 1.25rem;
+  color: var(--benext-darkgreen); /* Gewijzigd naar donkergroen voor betere hiërarchie */
+}
+
+/* ==========================================================================
+   ONDERSTE ZWEVENDE BALK (BOTTOM COMPARE BAR)
+   ========================================================================== */
+.bottom-compare-bar {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--benext-darkgreen);
+  padding: 0.8rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-width: 500px;
+  border-radius: var(--benext-radius) var(--benext-radius) 0 0;
+  z-index: 1000;
+  box-shadow: 0 -4px 15px rgba(0,0,0,0.2);
+}
+
+.bar-left-section {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.bar-counter {
+  background-color: var(--benext-lightgreen);
+  color: var(--benext-darkgreen);
+  padding: 8px 10px;
+  border-radius: var(--benext-radius);
+  font-size: 0.9rem;
+  min-width: 35px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.bar-counter.limit {
+  background-color: var(--benext-darkorange);
+  color: white;
+}
+
+/* De provider tags in de balk */
+.provider-tag {
+  background-color: var(--benext-green);
+  color: white;
+  padding: 8px 14px;
+  border-radius: var(--benext-radius);
+  font-family: var(--font-main);
+  font-size: 0.85rem;
+  margin-right: 8px;
+  border: 1px solid var(--benext-green);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* De "Bekijk vergelijking" knop in de balk */
+.bottom-bar-btn {
+  background-color: var(--benext-darkorange);
+  color: white;
+  border: none;
+  border-radius: var(--benext-radius);
+  padding: 8px 30px; 
+  font-family: var(--font-main);
+  font-size: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.bottom-bar-btn:hover {
+  background-color: var(--benext-orange);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+}
+
+.bottom-bar-btn:active {
+  transform: translateY(0);
+}
+
+.selected-providers {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap; /* Zorgt dat ze absoluut NIET naar de volgende regel springen */
 }

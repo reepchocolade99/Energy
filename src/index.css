@@ -1,5 +1,4 @@
-@import url('https://fonts.googleapis.com');
-
+@import url('https://fonts.googleapis.com/css2?family=Mulish:wght@300;400;700&display=swap');
 
 * {
   margin: 0;
@@ -7,16 +6,8 @@
   box-sizing: border-box;
 }
 
-body {
-  font-family: 'Mulish', sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background-color: #f5f5f5;
-}
-
-#root {
-  width: 100%;
-  min-height: 100vh;
+:root {
+  /* Je bestaande kleuren */
   --benext-darkgreen: #195c2f;
   --benext-green: #3C9953;
   --benext-lightgreen: #B0D7A6;
@@ -24,4 +15,12 @@ body {
   --benext-orange: #ffb86a;
   --benext-lightorange: #fdd8b8;
 
+  --benext-radius: 0.65rem; 
+  --font-main: 'Mulish', sans-serif;
+}
+
+body {
+  font-family: var(--font-main);
+  background-color: #f5f7fa;
+  margin: 0;
 }
