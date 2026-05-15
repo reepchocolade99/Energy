@@ -9,8 +9,8 @@ class EnergyCalculator:
         self.prices_path = os.path.join(self.current_dir, 'data', 'Netherlands.csv')
         self.dynamic_path = os.path.join(self.current_dir, 'data', 'dynamic_contracts.csv')
         self.fixed_path = os.path.join(self.current_dir, 'data', 'vast_contract_energie.csv')
+        self.variable_path = os.path.join(self.current_dir, 'data', 'variable_contract.csv')
         
-        # Constanten voor de Nederlandse markt (incl. BTW)
         self.EB_PER_KWH = 0.13165  
         self.NETBEHEER_JAAR = 560.00  
         
@@ -18,6 +18,14 @@ class EnergyCalculator:
         if not self.df.empty:
             self.df['is_normaal'] = self.df.index.map(self._is_normaal_tarief)
 
+    def _clean_float(self, val):
+        """Hulpmiddel om CSV strings met komma's veilig om te zetten naar floats."""
+        if pd.isna(val) or val == 0 or val == "0":
+            return 0.0
+        if isinstance(val, str):
+            return float(val.replace(',', '.').strip())
+        return float(val)
+    
     def _is_normaal_tarief(self, dt):
         """Ma-vr 07:00-23:00 geldt als normaaltarief."""
         if dt.weekday() >= 5: return False
@@ -61,44 +69,94 @@ class EnergyCalculator:
         return df.sort_index()
 
     def calculate(self, manual_hoog=None, manual_laag=None):
-        """Berekent de contractkosten op basis van data-schatting of handmatige invoer."""
         if self.df.empty: return []
 
-        # 1. Bepaal het data-gedreven verbruik
+        BTW_TARIEF = 1.21
+        all_results = []
+
+        # 1. Verbruik en Teruglevering bepalen (Schatting)
         months_in_data = self.df.index.month.unique()
         weight_cons = sum(self.get_seasonal_factor(m, is_solar=False) for m in months_in_data)
         weight_solar = sum(self.get_seasonal_factor(m, is_solar=True) for m in months_in_data)
 
         actual_cons = self.df['consumption_interval'].sum()
         actual_ret = self.df['return_interval'].sum()
-
         est_yearly_return = (actual_ret / weight_solar) if weight_solar > 0 else actual_ret * 12
 
-        # 2. Overschrijf verbruik als de gebruiker de UI-inputs gebruikt
         if manual_hoog is not None and manual_laag is not None:
-            est_yearly_usage = float(manual_hoog) + float(manual_laag)
+            est_high = float(manual_hoog)
+            est_low = float(manual_laag)
         else:
             est_yearly_usage = (actual_cons / weight_cons) if weight_cons > 0 else actual_cons * 12
+            est_high = est_yearly_usage * 0.5
+            est_low = est_yearly_usage * 0.5
+        
+        est_total_usage = est_high + est_low
 
-        all_results = []
+        # Helper functie voor de berekening per rij
+        def process_contract_row(row, contract_type):
+            # A. Tarieven (Exclusief)
+            p_norm_ex = self._clean_float(row.get('Normaal_ex', row.get('Normaal', 0)))
+            if p_norm_ex == 0: p_norm_ex = self._clean_float(row.get('Enkel_tarief_ex', 0))
+            
+            p_dal_ex = self._clean_float(row.get('Dal_ex', p_norm_ex))
+            if p_dal_ex == 0: p_dal_ex = p_norm_ex
+
+            # B. Belastingen (Energie_tax)
+            eb_csv = self._clean_float(row.get('Energie_tax', 0))
+            eb_to_use = eb_csv if eb_csv > 0 else self.EB_PER_KWH
+
+            # C. Tarieven (Inclusief) - Check CSV of bereken zelf
+            p_norm_incl = self._clean_float(row.get('Normaal_incl', 0))
+            if p_norm_incl == 0: p_norm_incl = (p_norm_ex + eb_to_use) * BTW_TARIEF
+            
+            p_dal_incl = self._clean_float(row.get('Dal_incl', 0))
+            if p_dal_incl == 0: p_dal_incl = (p_dal_ex + eb_to_use) * BTW_TARIEF
+
+            # D. Vaste Kosten (Jaarkosten/12 + Maandkosten)
+            mnd_vast_levering = (self._clean_float(row.get('Jaarkosten', 0)) / 12) + \
+                                 self._clean_float(row.get('Maandkosten', 0))
+
+            # E. Jaarberekening met Salderen (Hoog tarief eerst salderen)
+            rem_return = est_yearly_return
+            billed_high = max(0, est_high - rem_return)
+            rem_return = max(0, rem_return - est_high)
+            billed_low = max(0, est_low - rem_return)
+            
+            kosten_stroom = (billed_high * p_norm_incl) + (billed_low * p_dal_incl)
+            totaal_jaar = kosten_stroom + (mnd_vast_levering * 12) + self.NETBEHEER_JAAR
+
+            return {
+                'id': str(row.get('id', 'onbekend')),
+                'provider': row.get('Energieleverancier', 'Onbekend'),
+                'type': contract_type,
+                'monthlyCost': round(totaal_jaar / 12, 2),
+                'yearlyCost': round(totaal_jaar, 2),
+                'estUsage': round(est_total_usage, 0),
+                'estReturn': round(est_yearly_return, 0),
+                'compare_data': {
+                    'normaal_ex': round(p_norm_ex, 5),
+                    'normaal_incl': round(p_norm_incl, 5),
+                    'dal_ex': round(p_dal_ex, 5),
+                    'dal_incl': round(p_dal_incl, 5),
+                    'eb_used': round(eb_to_use, 5),
+                    'vaste_kosten_pm': round(mnd_vast_levering, 2),
+                    'netbeheer_pm': round(self.NETBEHEER_JAAR / 12, 2)
+                }
+            }
+
+        # --- Verwerk Variabele Contracten ---
+        if os.path.exists(self.variable_path):
+            var_df = pd.read_csv(self.variable_path)
+            for _, row in var_df.iterrows():
+                all_results.append(process_contract_row(row, 'Variabel'))
+
+        # --- Verwerk Vaste Contracten ---
         if os.path.exists(self.fixed_path):
-            fixed_df = pd.read_csv(self.fixed_path)
-            for idx, row in fixed_df.iterrows():
-                p_normaal = float(str(row['Normaal']).replace(',', '.'))
-                
-                # Salderen: Netto stroomverbruik (minimaal 0)
-                netto_verbruik = max(0, est_yearly_usage - est_yearly_return)
-                totaal_jaar = (netto_verbruik * (p_normaal + self.EB_PER_KWH)) + (7.0 * 12) + self.NETBEHEER_JAAR
-                
-                all_results.append({
-                    'id': str(row.get('id', f"fix-{idx}")),
-                    'provider': row['Energieleverancier'],
-                    'type': 'Vast' if 'Vast' in str(row['Contract']) else 'Variabel',
-                    'monthlyCost': round(totaal_jaar / 12, 2),
-                    'yearlyCost': round(totaal_jaar, 2),
-                    'estUsage': round(est_yearly_usage, 0),
-                    'estReturn': round(est_yearly_return, 0)
-                })
+            fix_df = pd.read_csv(self.fixed_path)
+            for _, row in fix_df.iterrows():
+                all_results.append(process_contract_row(row, 'Vast'))
+
         return all_results
 
     def get_summary(self):

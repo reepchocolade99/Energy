@@ -5,6 +5,7 @@ import './ComparePage.css';
 function ComparePage() {
   const navigate = useNavigate();
   const [contracts, setContracts] = useState([]);
+  const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedTypes, setSelectedTypes] = useState(['Vast', 'Dynamisch', 'Variabel']); 
   const [compareList, setCompareList] = useState([]);
@@ -14,15 +15,16 @@ function ComparePage() {
   const fetchContracts = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://127.0.0.1:5001/api/load-local-data');
+      const response = await fetch(`http://127.0.0.1:5001/api/load-local-data?manual_hoog=${consumption.hoog}&manual_laag=${consumption.laag}`);
       const data = await response.json();
       if (data.success) {
         setContracts(data.results || []);
+        setSummary(data.summary || null);
       }
     } catch (e) { 
       console.error("Fout bij laden data:", e); 
     } finally { 
-      setLoading(false); 
+      setLoading(false);
     }
   };
 
@@ -40,7 +42,7 @@ function ComparePage() {
     setCompareList((prev) => {
       const isAlreadySelected = prev.find((item) => item.id === contract.id);
       if (isAlreadySelected) return prev.filter((item) => item.id !== contract.id);
-      if (prev.length < 3) return [...prev, contract]; // Max 3 voor overzichtelijkheid
+      if (prev.length < 3) return [...prev, contract];
       return prev;
     });
   };
@@ -49,21 +51,18 @@ function ComparePage() {
 
   return (
     <div className="compare-layout">
-      {/* LINKER SIDEBAR - FILTERS */}
+      {/* --- LINKER SIDEBAR (FILTER) --- */}
       <aside className="left-sidebar">
         <button className="back-link" onClick={() => navigate('/personal-data')}>← Terug</button>
-        <h2 className="sidebar-title">Jouw Gegevens</h2>
-        
+        <h2 className="sidebar-title">Jouw Schatting</h2>
         <div className="input-group">
           <label>Verbruik Normaal (kWh)</label>
           <input type="number" value={consumption.hoog} onChange={(e) => setConsumption({...consumption, hoog: +e.target.value})} />
         </div>
-
         <div className="input-group">
           <label>Verbruik Dal (kWh)</label>
           <input type="number" value={consumption.laag} onChange={(e) => setConsumption({...consumption, laag: +e.target.value})} />
         </div>
-
         <button className="apply-btn" onClick={fetchContracts}>Update Berekening</button>
 
         <div className="type-selector-section">
@@ -76,21 +75,30 @@ function ComparePage() {
                   checked={selectedTypes.includes(type)}
                   onChange={() => handleTypeToggle(type)}
                 />
-                <span className="checkbox-label">
-                  {type}
-                </span>
+                <span className="checkbox-label">{type}</span>
               </label>
             ))}
           </div>
         </div>
-        </aside>
+      </aside>
 
-      {/* MIDDEN - CONTRACTEN */}
+      {/* --- HOOFDCONTENT --- */}
       <main className="results-area">
-        <h1 className="results-title">Beschikbare contracten</h1>
+        <div className="results-header">
+          <div>
+            <h1 className="results-title">Beschikbare contracten</h1>
+            {contracts.length > 0 && (
+              <p className="results-subtitle">
+                Op basis van: <strong>{contracts[0].estUsage} kWh</strong> verbruik en <strong>{contracts[0].estReturn} kWh</strong> teruglevering.
+              </p>
+            )}
+          </div>
+        </div>
+
         <div className="contracts-grid">
           {contracts
             .filter(c => selectedTypes.includes(c.type))
+            .sort((a, b) => a.monthlyCost - b.monthlyCost)
             .map((c) => (
               <ContractCard 
                 key={c.id} 
@@ -103,74 +111,96 @@ function ComparePage() {
         </div>
       </main>
 
-      {/* RECHTER SIDEBAR - VERGELIJKING (SCHUIFT IN) */}
-      <div className={`comparison-drawer ${isSidebarOpen ? 'open' : ''}`}>
-        <div className="drawer-header">
-          <h2>Vergelijking</h2>
-          <button className="close-drawer" onClick={() => setIsSidebarOpen(false)}>×</button>
-        </div>
-        <div className="drawer-content">
-          <table className="comparison-table">
-            <thead>
-              <tr>
-                <th>Kenmerken</th>
-                {compareList.map(c => (
-                  <th key={c.id}>{c.provider}</th>
-                ))}
-              </tr>
-            </thead>
-            {/* Zoek de <tbody> in je comparison-drawer en vervang de rijen: */}
-            <tbody>
-              <tr>
-                <td><strong>Type</strong></td>
-                {compareList.map(c => <td key={c.id}>{c.type || 'Variabel'}</td>)}
-              </tr>
-              <tr>
-                <td><strong style={{ color: '#f9943c' }}>Jaarverbruik (geschat)</strong></td>
-                {compareList.map(c => <td key={c.id}>{c.estUsage} kWh</td>)}
-              </tr>
-              <tr>
-                <td><strong style={{ color: '#3C9953' }}>Teruglevering (geschat)</strong></td>
-                {compareList.map(c => <td key={c.id}>-{c.estReturn} kWh</td>)}
-              </tr>
-              <tr>
-                <td><strong>Netto stroom</strong></td>
-                {compareList.map(c => (
-                  <td key={c.id}>
-                    {Math.max(0, c.estUsage - c.estReturn).toFixed(0)} kWh
-                  </td>
-                ))}
-              </tr>
-              <tr className="price-row">
-                <td><strong>Maandkosten</strong></td>
-                {compareList.map(c => (
-                  <td key={c.id} className="table-price" style={{ color: '#195c2f' }}> {/* BeNext Dark Green [cite: 16] */}
-                    €{c.monthlyCost.toFixed(2)}
-                  </td>
-                ))}
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* --- RECHTER DRAWER (VERGELIJKING) --- */}
+      {/* Alleen renderen als de sidebar open is en er iets te vergelijken valt */}
+      {isSidebarOpen && compareList.length > 0 && (
+        <div className="comparison-drawer open">
+          <div className="drawer-header">
+            <h2>Vergelijking</h2>
+            <button className="close-drawer" onClick={() => setIsSidebarOpen(false)}>×</button>
+          </div>
+          <div className="drawer-content">
+            <table className="comparison-table">
+              <thead>
+                <tr>
+                  <th>Kenmerken</th>
+                  {compareList.map(c => <th key={c.id}>{c.provider}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Jaarverbruik (est.)</td>
+                  {compareList.map(c => <td key={c.id}>{c.estUsage} kWh</td>)}
+                </tr>
+                <tr>
+                  <td>Jaar-teruglevering</td>
+                  {compareList.map(c => <td key={c.id} className="savings">-{c.estReturn} kWh</td>)}
+                </tr>
 
-      {/* ONDERSTE BALK */}
+                <tr className="section-header">
+                  <td colSpan={compareList.length + 1}>Stroomtarieven (per kWh)</td>
+                </tr>
+                <tr>
+                  <td>Normaal tarief</td>
+                  {compareList.map(c => <td key={c.id}>€{c.compare_data?.normaal_incl.toFixed(4)}</td>)}
+                </tr>
+                <tr>
+                  <td>Dal tarief</td>
+                  {compareList.map(c => <td key={c.id}>€{c.compare_data?.dal_incl.toFixed(4)}</td>)}
+                </tr>
+
+                <tr className="section-header">
+                  <td colSpan={compareList.length + 1}>Vaste Kosten (per maand)</td>
+                </tr>
+                <tr>
+                  <td>Vaste leveringskosten</td>
+                  {compareList.map(c => <td key={c.id}>€{c.compare_data?.vaste_kosten_pm.toFixed(2)}</td>)}
+                </tr>
+                <tr>
+                  <td>Netbeheerkosten</td>
+                  {compareList.map(c => <td key={c.id}>€{c.compare_data?.netbeheer_pm.toFixed(2)}</td>)}
+                </tr>
+
+                <tr className="section-header total-row">
+                  <td colSpan={compareList.length + 1}>Eindafrekening</td>
+                </tr>
+                <tr className="price-row">
+                  <td><strong>Maandkosten Totaal</strong></td>
+                  {compareList.map(c => (
+                    <td key={c.id} className="table-price-large">
+                      €{c.monthlyCost.toFixed(2)}
+                    </td>
+                  ))}
+                </tr>
+                <tr className="year-row">
+                  <td><strong>Jaarkosten Totaal</strong></td>
+                  {compareList.map(c => (
+                    <td key={c.id}><strong>€{c.yearlyCost.toFixed(2)}</strong></td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* --- ONDERBALK (STICKY) --- */}
       {compareList.length > 0 && (
         <div className="bottom-compare-bar">
           <div className="bar-left-section">
-            {/* DE TELLER IN DE BALK */}
             <div className={`bar-counter ${compareList.length >= 3 ? 'limit' : ''}`}>
               {compareList.length}/3
             </div>
-            
             <div className="selected-providers">
               {compareList.map(c => (
                 <span key={c.id} className="provider-tag">{c.provider}</span>
               ))}
             </div>
           </div>
-
-          <button className="compare-now-btn bottom-bar-btn" onClick={() => setIsSidebarOpen(true)}>
+          <button 
+            className="compare-now-btn bottom-bar-btn" 
+            onClick={() => setIsSidebarOpen(true)}
+          >
             Bekijk vergelijking
           </button>
         </div>
@@ -179,37 +209,27 @@ function ComparePage() {
   );
 }
 
+/* --- CONTRACT KAART COMPONENT --- */
 const ContractCard = ({ contract, onCompareToggle, isCompared }) => {
+  if (!contract) return null;
   const [euro, cents] = contract.monthlyCost.toFixed(2).split('.');
   
   return (
-    <div className="contract-card" style={{ borderRadius: '0.65rem' }}> {/*  */}
+    <div className="contract-card">
       <div className="card-body">
-        <span className="provider-name" style={{ fontWeight: 700, fontFamily: 'Mulish' }}>{contract.provider}</span>
-        
+        <span className="provider-name">{contract.provider}</span>
         <div className="price-tag"> 
           <span className="euro">€{euro}</span>
           <span className="cents">,{cents}</span>
           <span className="per-mnd">/mnd</span>
         </div>
-
-        {/* Energie details sectie */}
-        <div className="energy-details">
-          <div className="detail-item" style={{ color: 'var(--benext-green)' }}> {/* BeNext Dark Orange [cite: 17] */}
-            <strong>Verbruik:</strong> {contract.estUsage} kWh
-          </div>
-          <div className="detail-item" style={{ color: 'var(--benext-orange)' }}> {/* BeNext Green [cite: 18] */}
-            <strong>Teruglevering:</strong> {contract.estReturn} kWh
-          </div>
-        </div>
-
         <label className="compare-check">
           <input type="checkbox" checked={isCompared} onChange={onCompareToggle} />
           <span>Vergelijk</span>
         </label>
       </div>
       <div className={`contract-type-badge ${contract.type?.toLowerCase()}`}>
-        {contract.type || 'Onbekend'}
+        {contract.type}
       </div>
     </div>
   );

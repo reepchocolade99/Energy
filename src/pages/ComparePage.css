@@ -3,6 +3,7 @@
   --benext-darkgreen: #195c2f;
   --benext-green: #3C9953;
   --benext-lightgreen: #B0D7A6;
+  --benext-palegreen: #eefdf3;
   --benext-darkorange: #f9943c;
   --benext-orange: #ffb86a;
   --benext-radius: 0.65rem;
@@ -162,7 +163,7 @@ body {
   background: white;
   padding: 2rem;
   border-radius: var(--benext-radius);
-  border: 1px solid rgba(25, 92, 47, 0.1);
+  border: 1px solid rgba(var(--benext-darkgreen-rgb), 0.1);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   flex-direction: column;
@@ -171,7 +172,7 @@ body {
 
 .contract-card:hover {
   transform: translateY(-5px);
-  box-shadow: 0 12px 30px rgba(25, 92, 47, 0.08);
+  box-shadow: 0 12px 30px rgba(var(--benext-darkgreen-rgb), 0.08);
   border-color: var(--benext-green);
 }
 
@@ -253,79 +254,89 @@ body {
 /* ==========================================================================
    RECHTER DRAWER (VERGELIJKINGSTABEL)
    ========================================================================== */
-.comparison-drawer {
-  position: fixed;
-  right: -520px; /* Buiten beeld */
-  top: 0;
-  width: 500px;
-  height: 100vh;
-  background: white;
-  box-shadow: -5px 0 15px rgba(0,0,0,0.1);
-  transition: right 0.3s ease-in-out;
-  z-index: 2000;
-  display: flex;
-  flex-direction: column;
-}
 
-.comparison-drawer.open { 
-  right: 0; 
-}
-
-.drawer-header {
-  background: var(--benext-darkgreen);
-  color: white;
-  padding: 1.5rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.drawer-content {
-  padding: 1.5rem;
-  overflow-y: auto;
-}
-
-/* --- De Tabel in de Drawer --- */
 .comparison-table {
   width: 100%;
-  border-collapse: collapse;
+  border-spacing: 0;
+  background-color: var(--benext-palegreen); 
 }
 
-.comparison-table th, 
-.comparison-table td {
-  padding: 1.2rem 1rem;
-  text-align: left;
-  border-bottom: 1px solid #eaeaea;
-  font-size: 0.9rem;
-}
-
-.comparison-table th {
-  background-color: #f9fafb;
+/* --- BOVENSTE RIJ (Provider namen) --- */
+.comparison-table thead th {
+  background-color: var(--benext-palegreen);
   color: var(--benext-darkgreen);
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  vertical-align: bottom;
-}
-
-.comparison-table td:first-child {
-  font-weight: 400; /* Regular in plaats van Bold */
-  color: #333;
-  width: 30%;
-}
-
-.price-row td {
-  border-bottom: none;
-  padding-top: 20px;
-}
-
-.table-price {
+  padding: 1.25rem 0.75rem;
   font-weight: 800;
-  font-size: 1.25rem;
-  color: var(--benext-darkgreen); /* Gewijzigd naar donkergroen voor betere hiërarchie */
+  font-size: 0.9rem;
+  border-bottom: 2px solid var(--benext-lightgreen);
+  text-align: center;
 }
 
+/* Eerste kolom in de header (Kenmerken) */
+.comparison-table thead th:first-child {
+  text-align: left;
+  font-size: 0.75rem;
+}
+
+/* --- TUSSENKOPJES (Stroomtarieven, Vaste kosten, etc) --- */
+.comparison-table tbody tr.section-header td {
+  color: var(--benext-green);
+  font-weight: 800;
+  font-size: 0.8rem;
+  padding: 1rem 0.75rem;
+  border-bottom: 1px solid var(--benext-lightgreen);
+}
+
+/* --- ALGEMENE RIJEN EN CELLEN --- */
+.comparison-table td {
+  padding: 0.85rem 0.75rem;
+  font-size: 0.9rem;
+  color: var(--benext-green);
+  vertical-align: middle;
+}
+
+/* Labels aan de linkerkant */
+.comparison-table tbody td:first-child {
+  font-weight: 600;
+  color: var(--benext-darkgreen);
+  width: 45%;
+}
+
+/* De cijfers/data kolommen */
+.comparison-table tbody td:not(:first-child) {
+  text-align: center;
+  font-weight: 700;
+  color: var(--benext-darkgreen);
+}
+
+/* --- ONDERSTE SECTIE (Totalen) --- */
+
+/* Rij voor Maandkosten */
+.comparison-table tbody tr.price-row td {
+  background-color: white; /* Wit om de prijs eruit te laten springen */
+  border-top: 2px solid var(--benext-green);
+  padding: 1.25rem 0.75rem;
+}
+
+/* Het grote oranje bedrag */
+.comparison-table td.table-price-large {
+  color: var(--benext-darkorange);
+  
+}
+
+/* Rij voor Jaarkosten */
+.comparison-table tbody tr.year-row td {
+  background-color: white;
+  border-bottom: none;
+  padding: 1rem 0.75rem;
+}
+
+/* --- INTERACTIE --- */
+.comparison-table tbody tr:not(.section-header):hover td {
+  /* Bij hover wordt de rij iets lichter dan de palegreen achtergrond */
+  background-color: white;
+  transition: background 0.2s ease;
+}
 /* ==========================================================================
    ONDERSTE ZWEVENDE BALK (BOTTOM COMPARE BAR)
    ========================================================================== */
@@ -415,4 +426,23 @@ body {
   align-items: center;
   gap: 6px;
   flex-wrap: nowrap; /* Zorgt dat ze absoluut NIET naar de volgende regel springen */
+}
+
+.total-row {
+  background-color: var(--benext-palegreen);
+  color: var(--benext-darkgreen);
+}
+
+.table-price-large {
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: var(--benext-darkgreen);
+}
+
+.badge {
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #eee;
+  font-weight: normal;
 }
